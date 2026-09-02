@@ -11,6 +11,12 @@
 - 最高生产原则：**Preserve → Adapt → Generate**——能沿用的原样迁移，不符合新版结构/标准的改写，只有旧版缺失时才生成新内容。
 - 六条总原则：确定性优先于智能；结构化优先于 Prompt；规则优先于模型知识；人工确认优先于 AI；建议优先于自动修改；**Workflow 控制 AI，而不是 AI 控制 Workflow**。
 
+## 工程原则（2026-09-02，需求方确认）
+
+1. **库内容即插即用**：灵活修改和切换知识库与规则库是本项目的关键功能。正式数据库内容敲定之前，程序设计必须为库内容预留充分空间（稳定 ID + 作用域绑定 + JSONB 扩展字段 + 版本化），保证内容到位后即插即用；严禁把具体规则/知识内容写死进代码。
+2. **面向非技术用户**：目标用户不懂代码。在完整实现功能的前提下，尽量简化代码结构与前端操作逻辑，界面语言使用教研术语而非工程术语，便于使用和维护。
+3. **可移交性**：项目开发后期将整体移交，开发全程遵循 `docs/HANDOVER.md` 约定（表结构走 migrations 进 git、密钥不进库、文档同步更新）。此条重要性最低，不得影响开发效果与进度。
+
 ## 已确认的核心决策
 
 - 业务层级：`Project → Grade → Term/Course → Lesson → 四书 → Module`；最小生成单位是 **Module**（一次生成一个完整模块，不逐段生成）。
@@ -64,7 +70,8 @@
 
 ## 当前实现状态与已知差距
 
-- 前端原型已迁入本项目：Next.js 16 + React 19 + TypeScript + Tailwind CSS 4，纯 Mock，无后端、无数据库、无 AI 接入。
+- 前端原型已迁入本项目：Next.js 16 + React 19 + TypeScript + Tailwind CSS 4，仍为纯 Mock 交互。
+- 数据库迁移（curriculum / rules / knowledge）与 AI Gateway 双模式代码已就位：待 Supabase 项目创建并在 `.env.local` 填好环境变量后即可接入；AI Gateway 默认 mock 模式，无真实 Key 也能联调整条管线。
 - 原型中的 `Unit` 命名、同步 `setTimeout` 模拟生成、只读 Markdown 正文、模拟保存/导出均不是正式契约，实现时一律按 profile.md 修正。
 - 视觉系统见 `DESIGN.md`（出版排样台视觉语言），原型交互基线见 `PRODUCT.md`；二者仍适用于前端开发，但业务行为以 profile.md 为准。
 - 主要五大风险（profile.md 第三十七节）：扫描 PDF 解析质量、规则工程未开始、AI 过度改写、四书内容漂移、规则更新污染历史。
@@ -74,3 +81,4 @@
 - 2026-08-26：完成两轮访谈并产出初始共识与 ADR（已归档至 `_archive/pre-profile-docs-2026-09-01/`）。
 - 2026-09-01：需求方确认 GPT 产出的总体方案 `profile.md` 为唯一权威方案，取代此前所有过程文档。
 - 2026-09-02：建立版本控制与移交机制（git 仓库、`.env.example`、`docs/HANDOVER.md`）；确认以现有示例规则先行搭建前后端，真实规则与知识库内容由教研老师整理到位后经系统界面录入，不做代码改动。
+- 2026-09-02：记录三条工程原则（库内容即插即用 / 面向非技术用户 / 可移交性）；动工第一批基础设施：curriculum、rules、knowledge 三组迁移 + seed 示例数据 + Supabase 服务端客户端 + AI Gateway（mock / anthropic-compatible 双模式）。

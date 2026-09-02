@@ -18,8 +18,8 @@
 1. 克隆仓库,执行 `npm install`。
 2. 复制 `.env.example` 为 `.env.local`,向原维护者索取真实值并填入。
 3. 数据库重建(二选一):
-   - **接管现有项目**:`npx supabase link --project-ref <项目ref>`,确认 `supabase db pull` 无差异;
-   - **全新项目**:`npx supabase db push` 按 `supabase/migrations/` 顺序建表,再按需导入 `supabase/seed.sql`。
+   - **接管现有项目**:`npx supabase init`(仅首次,生成 config.toml)→ `npx supabase link --project-ref <项目ref>` → `npx supabase db push` 按 `supabase/migrations/` 顺序建表;
+   - **全新项目**:同上;或直接在 Supabase SQL Editor 中按文件名顺序执行 `supabase/migrations/*.sql`,再执行 `supabase/seed.sql`(示例数据,可选)。
 4. `npm run dev` 启动,验证首页与工作台可用。
 5. 接管 Supabase Organization 与 Vercel 项目所有权(见上表)。
 
