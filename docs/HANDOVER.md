@@ -7,7 +7,7 @@
 
 | 资产 | 位置 | 移交方式 |
 | --- | --- | --- |
-| 代码 / 文档 / 数据库迁移 | git 仓库 | 添加协作者或转移仓库所有权 |
+| 代码 / 文档 / 数据库迁移 | GitHub · https://github.com/ForgetMe-not726/Tal | 添加协作者或转移仓库所有权 |
 | 数据库(表结构 + 数据) | Supabase 项目(云) | 邀请进 Organization / 转移 Owner;或 `pg_dump` 导出交付 |
 | 文件(PDF、图片、DOCX) | Supabase Storage | Storage 单独导出(**不在 pg_dump 范围内**) |
 | 密钥(Supabase Key、AI 网关 Key 等) | `.env.local` / Vercel 环境变量 | 密码管理器等安全渠道交付;**移交后轮换全部旧 Key** |
