@@ -1,0 +1,129 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  /* 出版排样台 · 墨色系 */
+  --color-canvas: #e9edf1; /* 拷贝台 / light table */
+  --color-canvas-deep: #dfe4ea;
+  --color-paper: #ffffff; /* 拼版纸（工具 chrome） */
+  --color-sheet: #fbf8f1; /* 暖纸白：A4 正文纸 */
+  --color-ink: #161b20; /* 墨黑（Key） */
+  --color-ink-2: #46505a; /* 次墨 */
+  --color-ink-3: #5b6773; /* 浅墨（≥4.5:1 于白底与暖纸底） */
+  --color-line: #e2e7ec; /* 发丝线 */
+  --color-brand: #0056bf; /* 青版 / 学而思蓝 */
+  --color-brand-deep: #003a8c;
+  --color-brand-tint: #e5effb;
+  --color-spot: #f97316; /* 专色 / 学而思橙 */
+  --color-spot-tint: #feefe3;
+  --color-reg: #00a06b; /* 套准绿 */
+  --color-reg-tint: #e4f6ee;
+  --color-violet: #7c5cff; /* 紫版 */
+  --color-violet-tint: #efeaff;
+  --color-proof: #e5484d; /* 校对红 */
+  --color-chrome: #14181c; /* 深色侧栏 */
+  --color-chrome-2: #1e242a;
+
+  --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    "Segoe UI", system-ui, -apple-system, "Noto Sans SC", sans-serif;
+  --font-serif: "Songti SC", "STSong", "SimSun", "Noto Serif SC",
+    "Source Han Serif SC", Georgia, "Times New Roman", serif;
+  --font-mono: "SF Mono", "Cascadia Code", "Consolas", "JetBrains Mono",
+    ui-monospace, "Roboto Mono", monospace;
+
+  --shadow-paper: 0 1px 1px rgba(22, 27, 32, 0.06),
+    0 8px 24px rgba(22, 27, 32, 0.08), 0 24px 48px -16px rgba(22, 27, 32, 0.14);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* 浏览器表面也是设计的一部分 */
+  ::selection {
+    background-color: var(--color-brand);
+    color: #ffffff;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #c3ccd4 transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background-color: #c3ccd4;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* 落墨动画：正文块像油墨沉降 */
+/* ------------------------------------------------------------------ */
+@keyframes ink-settle {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@keyframes plate-fill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-ink-settle {
+  animation: ink-settle 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-plate-fill {
+  animation: plate-fill 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ink-settle,
+  .animate-plate-fill {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+  }
+}
