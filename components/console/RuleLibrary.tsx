@@ -66,9 +66,15 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleString("zh-CN", { dateStyle: "short", timeStyle: "short" });
 }
 
-export function RuleLibrary() {
-  const [rules, setRules] = React.useState<RuleVM[] | null>(null);
-  const [loadError, setLoadError] = React.useState<string | null>(null);
+interface RuleLibraryProps {
+  /** 首屏数据由服务端组件(app/page.tsx)读取提供,客户端只做重试与变更后更新 */
+  initialRules: RuleVM[] | null;
+  initialError: string | null;
+}
+
+export function RuleLibrary({ initialRules, initialError }: RuleLibraryProps) {
+  const [rules, setRules] = React.useState<RuleVM[] | null>(initialRules);
+  const [loadError, setLoadError] = React.useState<string | null>(initialError);
 
   const [openRule, setOpenRule] = React.useState<RuleVM | null>(null);
   const [selectedVersionId, setSelectedVersionId] = React.useState<string | null>(null);
@@ -79,21 +85,17 @@ export function RuleLibrary() {
   const [toast, setToast] = React.useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const toastTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const load = React.useCallback(async () => {
-    setLoadError(null);
+  async function load() {
     try {
       const res = await fetch("/api/rules", { cache: "no-store" });
       const data = (await res.json()) as { rules?: RuleVM[]; error?: string };
       if (!res.ok) throw new Error(data.error ?? "加载失败");
       setRules(data.rules ?? []);
+      setLoadError(null);
     } catch (e) {
       setLoadError((e as Error).message);
     }
-  }, []);
-
-  React.useEffect(() => {
-    void load();
-  }, [load]);
+  }
 
   React.useEffect(() => {
     if (!toast) return;

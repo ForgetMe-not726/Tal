@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, ClipboardCheck, Database, FilePlus2 } from "lucide-react";
 import { RuleLibrary } from "@/components/console/RuleLibrary";
+import { listRulesWithVersions } from "@/lib/rules/service";
 import { FLOW_UNITS } from "@/lib/mock";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +17,16 @@ const ACCENT = {
   neutral: { chip: "bg-canvas-deep text-ink-2" },
 } as const;
 
-export default function Home() {
+export default async function Home() {
+  type Rules = Awaited<ReturnType<typeof listRulesWithVersions>>;
+  let initialRules: Rules | null = null;
+  let initialError: string | null = null;
+  try {
+    initialRules = await listRulesWithVersions();
+  } catch (error) {
+    initialError = (error as Error).message;
+  }
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-5xl px-8 py-10">
@@ -106,7 +116,7 @@ export default function Home() {
           <p className="mt-0.5 text-sm text-ink-3">
             灰箱接口 · 修改规则文件会改变 AI 的生成行为
           </p>
-          <RuleLibrary />
+          <RuleLibrary initialRules={initialRules} initialError={initialError} />
         </section>
       </div>
     </div>

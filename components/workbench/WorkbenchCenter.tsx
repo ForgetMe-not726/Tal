@@ -123,10 +123,6 @@ function EditableFileName({
     if (editing) inputRef.current?.focus();
   }, [editing]);
 
-  React.useEffect(() => {
-    setDraft(value);
-  }, [value]);
-
   function commit() {
     const v = draft.trim();
     if (v) onCommit(v);
