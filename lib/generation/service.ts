@@ -12,6 +12,7 @@ import type { SourceVerificationMode } from "@/lib/knowledge/types";
 import { saveSourceImport } from "@/lib/knowledge/repository";
 import type { OutlineLessonProfile } from "@/lib/outline/types";
 import { buildKnowledgeContext } from "@/lib/knowledge/context-builder";
+import { loadRelatedVersions, type RelatedVersion } from "@/lib/knowledge/related-content";
 import { retrieveKnowledge } from "@/lib/knowledge/retriever";
 import { buildMigrationPlan, type MigrationPlan } from "@/lib/generation/planner";
 import { buildDeterministicObjectives } from "@/lib/generation/objectives";
@@ -59,14 +60,6 @@ export type GenerationContext = GenerationContextInput & {
   moduleId: string;
   /** 落库后的实际课型（客户端没传时用库里已有的）。 */
   lessonType: LessonType;
-};
-
-type RelatedVersion = {
-  bookType: string;
-  moduleKey: string;
-  moduleLabel: string;
-  version: ModuleVersionRow;
-  markdown: string;
 };
 
 export type SavedModuleVersion = ModuleVersionRow;
@@ -136,15 +129,6 @@ function cleanMarkdown(text: string): string {
   )
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-}
-
-function contentToMarkdown(content: unknown): string {
-  if (typeof content === "string") return content;
-  if (content && typeof content === "object") {
-    const value = content as { markdown?: unknown };
-    if (typeof value.markdown === "string") return value.markdown;
-  }
-  return "";
 }
 
 function normalizeLessonProfile(value: unknown, expectedLessonNumber: number): OutlineLessonProfile | undefined {
@@ -310,35 +294,6 @@ export async function ensureGenerationContext(input: GenerationContextInput): Pr
   const ids = await ensureProjectAndLesson(input);
   const moduleInfo = await ensureBookAndModule(input, ids.projectId, ids.lessonId);
   return { ...input, ...ids, ...moduleInfo };
-}
-
-async function loadRelatedVersions(context: GenerationContext): Promise<RelatedVersion[]> {
-  const store = getAppStore();
-  const books = await store.listBooksByLesson(context.lessonId);
-  const bookIds = books.map((book) => book.id);
-  if (bookIds.length === 0) return [];
-  const modules = await store.listModulesByBookIds(bookIds);
-  const eligible = modules.filter((module) => module.id !== context.moduleId && module.status === "confirmed");
-  if (eligible.length === 0) return [];
-  const versions = await store.listModuleVersions({ moduleIds: eligible.map((module) => module.id) });
-  const bookTypeById = new Map(books.map((book) => [book.id, book.book_type]));
-  const moduleById = new Map(eligible.map((module) => [module.id, module]));
-  const seen = new Set<string>();
-  const result: RelatedVersion[] = [];
-  for (const version of versions) {
-    if (seen.has(version.module_id)) continue;
-    const moduleRow = moduleById.get(version.module_id);
-    if (!moduleRow) continue;
-    seen.add(version.module_id);
-    result.push({
-      bookType: bookTypeById.get(moduleRow.book_id) ?? "unknown",
-      moduleKey: moduleRow.module_key,
-      moduleLabel: moduleRow.display_name,
-      version,
-      markdown: contentToMarkdown(version.content),
-    });
-  }
-  return result;
 }
 
 function resolutionContext(context: GenerationContext): RuleResolutionContext {
@@ -555,7 +510,10 @@ export async function generateModule(request: GenerationRequest, signal?: AbortS
       targetModuleLabel: context.moduleLabel,
       allowSemanticFallback: false,
     }),
-    loadRelatedVersions(context),
+    // 同一 Lesson 的其他已确认内容（共用加载器：生成与修改建议用同一套口径）
+    loadRelatedVersions({ lessonId: context.lessonId, excludeModuleId: context.moduleId }).then(
+      (result) => result.versions,
+    ),
   ]);
   throwIfAborted(signal);
   // 课时目标来自大纲，不依赖旧版来源，因此不要求检索到内容。

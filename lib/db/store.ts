@@ -16,7 +16,7 @@ import type {
   RuleVersionRow,
   SourceModuleRow,
 } from "@/lib/db/types";
-import { getFileStore } from "@/lib/db/file-store";
+import { getFileStore } from "./file-store.ts";
 
 export type SourceModuleFilter = {
   projectId?: string;

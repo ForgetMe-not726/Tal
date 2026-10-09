@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FileStore, FileStoreError } from "../lib/db/file-store.ts";
+import { loadRelatedVersions } from "../lib/knowledge/related-content.ts";
 import { ensureWorkspace } from "../lib/workspace/bootstrap.ts";
 import { readJson, writeJson } from "../lib/workspace/json.ts";
 
@@ -418,6 +419,65 @@ async function testUnsafeSegmentsAreSanitized() {
   });
 }
 
+/**
+ * 跨书上下文加载器（生成与修改建议共用）。
+ *
+ * 关键不变量：**草稿不能当上下文依据**——只取已确认模块，且必须排除正在改的那一个。
+ * 这条守不住的话，AI 会拿自己没被确认过的草稿去"参考"，错上加错。
+ */
+async function testRelatedContentLoader() {
+  await withWorkspace(async () => {
+    const s = store();
+    const project = await s.insertProject({ name: "P", grade: "L5", term: "winter" });
+    const lesson = await s.insertLesson({ project_id: project.id, lesson_number: 1, title: "L1" });
+    const student = await s.insertBook({ lesson_id: lesson.id, book_type: "student" });
+    const workbook = await s.insertBook({ lesson_id: lesson.id, book_type: "workbook" });
+
+    const version = (moduleId, markdown) =>
+      s.insertModuleVersion({
+        module_id: moduleId,
+        version_number: 1,
+        content: { markdown },
+        content_format: "markdown",
+        origin_kind: "ai_generated",
+        origin_summary: { copy: 0, adapt: 0, generate: 1 },
+        created_by: "system",
+      });
+
+    const self = await s.insertModule({ book_id: student.id, module_key: "lets_say", display_name: "Say", sort_order: 1 });
+    await version(self.id, "自己的正文");
+    const confirmed = await s.insertModule({ book_id: workbook.id, module_key: "day_1", display_name: "Day 1", sort_order: 1 });
+    await version(confirmed.id, "练习册正文");
+    await s.updateModuleStatus(confirmed.id, "confirmed");
+    const draft = await s.insertModule({ book_id: workbook.id, module_key: "day_2", display_name: "Day 2", sort_order: 2 });
+    await version(draft.id, "草稿正文");
+
+    const result = await loadRelatedVersions({ lessonId: lesson.id, excludeModuleId: self.id });
+    assert.deepEqual(result.versions.map((item) => item.moduleKey), ["day_1"], "只取已确认模块，并排除自己");
+    assert.equal(result.versions[0].markdown, "练习册正文");
+    assert.equal(result.versions[0].bookType, "workbook");
+    assert.equal(result.omitted, 0);
+
+    // 自己也没被确认时，仍然不能出现在"其他内容"里
+    await s.updateModuleStatus(self.id, "confirmed");
+    const stillExcluded = await loadRelatedVersions({ lessonId: lesson.id, excludeModuleId: self.id });
+    assert.deepEqual(stillExcluded.versions.map((item) => item.moduleKey), ["day_1"]);
+
+    // 预算：超了就少带，并如实报告少带了几个
+    const budgeted = await loadRelatedVersions({ lessonId: lesson.id, excludeModuleId: self.id, maxChars: 1 });
+    assert.equal(budgeted.versions.length, 0);
+    assert.equal(budgeted.omitted, 1);
+
+    // 只留某些书种
+    const studentOnly = await loadRelatedVersions({
+      lessonId: lesson.id,
+      excludeModuleId: self.id,
+      bookTypes: ["student"],
+    });
+    assert.deepEqual(studentOnly.versions, [], "学生用书里只有自己，排除后为空");
+  });
+}
+
 const tests = [
   ["工作区初始化建出完整目录树", testBootstrapCreatesTree],
   ["初始化幂等且不覆盖老师内容", testBootstrapIsIdempotentAndNonDestructive],
@@ -432,6 +492,7 @@ const tests = [
   ["损坏的 JSON 明确报错", testCorruptedJsonThrows],
   ["并发写不丢数据", testConcurrentWritesDoNotLoseData],
   ["危险目录名被安全化", testUnsafeSegmentsAreSanitized],
+  ["跨书上下文只取已确认且排除自己", testRelatedContentLoader],
 ];
 
 for (const [name, test] of tests) {
