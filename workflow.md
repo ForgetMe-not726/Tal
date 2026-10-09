@@ -76,7 +76,7 @@
 | 教材制作（Local-2） | 三书迁移闭环可用 | `npm test` 全量；真实教材端到端生成 + DOCX 导出 |
 | 教材审校（Local-3 后半） | **2026-10-08 机器已落地**：`/review` 页面、八段 Pipeline、`manifest/findings/decisions/report.html` 契约、人工决定与固定模板报告；范围支持「单模块 / 整本书」。**2026-10-09 接入公司审校标准**：`pet-material-review` v1.0.0 的 24 条规则进随包基线，判据材料按 `standard_refs` 定向取用，执行方式分流（`human_visual` 如实标注为需人工目视核对），三态结果的「无法核查」结构化记入 Finding，规则集身份进 manifest | `npm run test:review-pipeline`、`npm run test:review-report`、`npm run test:review-jobs`、`npm run test:review-skill`；真实样张：对 Lesson 1 学生用书 `lets_say` v2 跑一次审校 → 生效 28 条（24 条标准规则 + 4 条本项目审校规则）、取用 38 个判据小节、10 条 Finding（含 4 条待目视、多条缺证）→ 采用/忽略 → 生成并查看报告 |
 | 单词小超市（Local-3 前半） | 只有枚举占位：模块目录 0 条，选中即报错 | — |
-| 修改建议（Local-4） | 自然语言 + 逐条采用已可用；缺 Context Pack（规则 ID + 来源定位）与 Cambridge 证据 | `npm run test:mvp` |
+| 修改建议（Local-4） | **2026-10-09 补上 Context Pack**：七部分齐（老师要求 / 当前模块版本 / Lesson Context / 生效规则 / 跨书上下文 / 本地参考资料 / 资料缺口）；生成规则与审校规则都作为**参考知识库**进 Pack（不逐条机械对照，老师的要求是任务目标）；规则冲突与资料缺口如实列出；建议卡片带规则依据、来源定位（可「查看原页」）与不确定性；运行记录写 `.app/jobs/suggestions/`。**已知缺口**：工作区没有 Cambridge 参考资料（Q-CORE-030）、「其他已确认内容」几乎不出现（Q-CORE-031） | `npm run test:suggestion`、`npm run test:mvp`、`npm run test:store`；真实样张：对 Lesson 1 学生用书 `lets_read` 跑一次 → 62 条规则进 Pack、3 条缺口如实列出、11 条建议各自带规则 ID 与不确定性 |
 | 通用助手（Local-5） | 未开始；待本地检索工具代码（Q-CORE-016） | — |
 
 ## 会话结束检查
