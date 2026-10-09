@@ -1,0 +1,12 @@
+{
+  "rule_id": "cb6c20f4-1461-594d-a34a-df5105931ff8",
+  "version_number": 1,
+  "instruction": "- **触发**：解析出文本或页面后、开始判定前。\n- **检查**：\n  - 分别登记页框、任务容器和最小独立判断元素。\n  - 词条、表格单元、规则、正文句、每道小题、指令、图片和关键音视频对象都可定位。\n  - 题干、选项和预期答案在同一题元素内一起审，但多个独立小题不能合并。\n  - 每个 review-list 源行及适用原子项至少映射一次；全书门控不替代局部核查。\n- **判定**：\n  - 通过：原件与元素清单逐页对照，页、任务和叶元素均有可追溯位置。\n  - 需要修改：教材的编号、页面框架或内部元素确有错位/遗漏。\n  - 材料未提供无法核查：解析缺页、低清或缺少版面材料，无法确定清单是否完整。\n- **需要的证据**：实际页码/逻辑页；稳定 element_id 与定位符；review-list source_ids 与 checks.id",
+  "constraints": {},
+  "status": "published",
+  "created_by": "skill-migration",
+  "change_note": "从 pet-material-review v1.0.0 迁移",
+  "created_at": "2026-10-08T00:00:00.000Z",
+  "published_at": "2026-10-08T00:00:00.000Z",
+  "id": "8ab20c10-ebae-56c2-ae75-5d07cd5315fe"
+}

@@ -1,0 +1,37 @@
+{
+  "rule_key": "VIS-001",
+  "display_name": "图片教学焦点、诊断特征与事实相符",
+  "rule_type": "review",
+  "is_hard": true,
+  "description": "pet-material-review v1.0.0",
+  "payload": {
+    "phase": "visual",
+    "executionMode": "human_visual",
+    "elementKinds": [
+      "image",
+      "question",
+      "task"
+    ],
+    "materials": [
+      "all"
+    ],
+    "reviewListRefs": [
+      "SB05",
+      "SB07",
+      "SB08",
+      "WB07",
+      "WB08",
+      "VS07",
+      "VS08",
+      "VS09"
+    ],
+    "standardRefs": [
+      "references/review-standards.md:5.3",
+      "references/review-list.md:SB05、SB08、WB07"
+    ],
+    "sourceSkillRef": "pet-material-review v1.0.0#VIS-001"
+  },
+  "id": "e70a4d23-87fe-5bc1-ac91-8ba3ccee71f0",
+  "created_at": "2026-10-08T00:00:00.000Z",
+  "updated_at": "2026-10-08T00:00:00.000Z"
+}

@@ -1,0 +1,12 @@
+{
+  "rule_id": "dd0dbdeb-a3d5-5ff9-ae52-5f6d831271eb",
+  "version_number": 1,
+  "instruction": "- **触发**：出现 Cambridge/B1 Preliminary/B2 First、Part、真题、高保真模拟或 Exam tip 声称。\n- **检查**：\n  - 按当前官方来源核对级别、Part、题型、题数、选项、作答动作、字数、时间、示例和版面。\n  - 来源标签不能替代题目正确性审校；自编任务须准确标为练习/模拟。\n  - Exam tip 紧邻具体任务，说明考生要做什么及适用的题数/选项。\n- **判定**：\n  - 通过：所有声称与现行官方任务要求一致，模拟任务标识准确。\n  - 需要修改：Part、题数、选项、作答动作或官方身份错标/不完整。\n  - 材料未提供无法核查：现行官方规范或声称的完整试题材料无法取得。\n- **需要的证据**：官方手册/格式来源及日期；教材题面和题数；标签/Exam tip位置",
+  "constraints": {},
+  "status": "published",
+  "created_by": "skill-migration",
+  "change_note": "从 pet-material-review v1.0.0 迁移",
+  "created_at": "2026-10-08T00:00:00.000Z",
+  "published_at": "2026-10-08T00:00:00.000Z",
+  "id": "7a78bc75-641d-5cec-affa-04878a92aef6"
+}

@@ -1,0 +1,38 @@
+{
+  "rule_key": "LEX-001",
+  "display_name": "词条语义链闭合",
+  "rule_type": "review",
+  "is_hard": false,
+  "description": "pet-material-review v1.0.0",
+  "payload": {
+    "phase": "language",
+    "executionMode": "hybrid",
+    "elementKinds": [
+      "word",
+      "question",
+      "sentence"
+    ],
+    "materials": [
+      "all"
+    ],
+    "reviewListRefs": [
+      "SB08",
+      "SB09",
+      "WB08",
+      "WB10",
+      "VS08",
+      "VS09",
+      "VS10",
+      "KL06",
+      "KL07"
+    ],
+    "standardRefs": [
+      "references/review-standards.md:3.1",
+      "references/review-list.md:WB08、KL06、KL07"
+    ],
+    "sourceSkillRef": "pet-material-review v1.0.0#LEX-001"
+  },
+  "id": "c2488671-3ac5-5f46-a90c-ecfab1dc7574",
+  "created_at": "2026-10-08T00:00:00.000Z",
+  "updated_at": "2026-10-08T00:00:00.000Z"
+}

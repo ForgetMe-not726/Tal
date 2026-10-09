@@ -1,0 +1,41 @@
+{
+  "rule_key": "FACT-001",
+  "display_name": "事实命题、限定与审校日时效",
+  "rule_type": "review",
+  "is_hard": true,
+  "description": "pet-material-review v1.0.0",
+  "payload": {
+    "phase": "facts",
+    "executionMode": "source_lookup",
+    "elementKinds": [
+      "sentence",
+      "question",
+      "image",
+      "audio",
+      "global"
+    ],
+    "materials": [
+      "all"
+    ],
+    "reviewListRefs": [
+      "SB05",
+      "SB07",
+      "SB11",
+      "WB07",
+      "WB10",
+      "WB11",
+      "VS07",
+      "KL06",
+      "KL07",
+      "GLOBAL-FACTS"
+    ],
+    "standardRefs": [
+      "references/review-standards.md:事实与时效核查",
+      "references/delivery-and-sources.md:来源登记"
+    ],
+    "sourceSkillRef": "pet-material-review v1.0.0#FACT-001"
+  },
+  "id": "6ca78354-c28a-5685-a76e-6096ca4408ec",
+  "created_at": "2026-10-08T00:00:00.000Z",
+  "updated_at": "2026-10-08T00:00:00.000Z"
+}

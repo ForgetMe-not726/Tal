@@ -1,0 +1,38 @@
+{
+  "rule_key": "ANSWER-002",
+  "display_name": "对抗式检查多解、无解与干扰项",
+  "rule_type": "review",
+  "is_hard": true,
+  "description": "pet-material-review v1.0.0",
+  "payload": {
+    "phase": "answer",
+    "executionMode": "model_assisted",
+    "elementKinds": [
+      "question"
+    ],
+    "materials": [
+      "all"
+    ],
+    "reviewListRefs": [
+      "SB09",
+      "SB12",
+      "SB14",
+      "SB16",
+      "WB08",
+      "WB09",
+      "WB10",
+      "WB11",
+      "VS08",
+      "VS09",
+      "VS10"
+    ],
+    "standardRefs": [
+      "references/review-standards.md:4",
+      "references/grammar-review.md:报告写法"
+    ],
+    "sourceSkillRef": "pet-material-review v1.0.0#ANSWER-002"
+  },
+  "id": "1cd8b508-c664-592a-a8ad-54c7a5ec5c74",
+  "created_at": "2026-10-08T00:00:00.000Z",
+  "updated_at": "2026-10-08T00:00:00.000Z"
+}

@@ -1,0 +1,41 @@
+{
+  "rule_key": "ANSWER-001",
+  "display_name": "逐题独立求解与答案材料核对",
+  "rule_type": "review",
+  "is_hard": true,
+  "description": "pet-material-review v1.0.0",
+  "payload": {
+    "phase": "answer",
+    "executionMode": "hybrid",
+    "elementKinds": [
+      "question",
+      "answer_key",
+      "audio",
+      "cross_reference"
+    ],
+    "materials": [
+      "all"
+    ],
+    "reviewListRefs": [
+      "SB09",
+      "SB12",
+      "SB14",
+      "SB16",
+      "WB08",
+      "WB09",
+      "WB10",
+      "WB11",
+      "VS08",
+      "VS09",
+      "VS10"
+    ],
+    "standardRefs": [
+      "references/review-standards.md:4",
+      "references/review-list.md:WB11"
+    ],
+    "sourceSkillRef": "pet-material-review v1.0.0#ANSWER-001"
+  },
+  "id": "2321e327-c5da-5a7a-a177-fdf682a3d76c",
+  "created_at": "2026-10-08T00:00:00.000Z",
+  "updated_at": "2026-10-08T00:00:00.000Z"
+}

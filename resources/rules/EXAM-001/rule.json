@@ -1,0 +1,41 @@
+{
+  "rule_key": "EXAM-001",
+  "display_name": "Cambridge 官方任务标签与任务契约",
+  "rule_type": "review",
+  "is_hard": true,
+  "description": "pet-material-review v1.0.0",
+  "payload": {
+    "phase": "exam",
+    "executionMode": "source_lookup",
+    "elementKinds": [
+      "task",
+      "question",
+      "page"
+    ],
+    "materials": [
+      "学生用书",
+      "练习册",
+      "小超市"
+    ],
+    "reviewListRefs": [
+      "SB10",
+      "SB15",
+      "SB16",
+      "WB06",
+      "WB09",
+      "WB10",
+      "WB11",
+      "VS06",
+      "VS09",
+      "VS10"
+    ],
+    "standardRefs": [
+      "references/review-standards.md:7、8",
+      "references/grammar-review.md:Cambridge 考点映射"
+    ],
+    "sourceSkillRef": "pet-material-review v1.0.0#EXAM-001"
+  },
+  "id": "dd0dbdeb-a3d5-5ff9-ae52-5f6d831271eb",
+  "created_at": "2026-10-08T00:00:00.000Z",
+  "updated_at": "2026-10-08T00:00:00.000Z"
+}

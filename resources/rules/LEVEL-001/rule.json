@@ -1,0 +1,47 @@
+{
+  "rule_key": "LEVEL-001",
+  "display_name": "B1—B2 难度与梯度证据",
+  "rule_type": "review",
+  "is_hard": true,
+  "description": "pet-material-review v1.0.0",
+  "payload": {
+    "phase": "difficulty",
+    "executionMode": "model_assisted",
+    "elementKinds": [
+      "task",
+      "question",
+      "sentence",
+      "global"
+    ],
+    "materials": [
+      "all"
+    ],
+    "reviewListRefs": [
+      "SB07",
+      "SB09",
+      "SB11",
+      "SB12",
+      "SB13",
+      "SB14",
+      "SB16",
+      "WB08",
+      "WB09",
+      "WB10",
+      "WB11",
+      "VS08",
+      "VS09",
+      "VS10",
+      "KL06",
+      "KL07",
+      "KL08"
+    ],
+    "standardRefs": [
+      "references/review-standards.md:6",
+      "references/grammar-review.md:语法范围"
+    ],
+    "sourceSkillRef": "pet-material-review v1.0.0#LEVEL-001"
+  },
+  "id": "c50e248e-2c7a-5767-af37-9a292e8aeac5",
+  "created_at": "2026-10-08T00:00:00.000Z",
+  "updated_at": "2026-10-08T00:00:00.000Z"
+}

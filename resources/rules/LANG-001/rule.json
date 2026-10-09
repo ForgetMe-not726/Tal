@@ -1,0 +1,72 @@
+{
+  "rule_key": "LANG-001",
+  "display_name": "全英文字符、拼写、词形与句法",
+  "rule_type": "review",
+  "is_hard": true,
+  "description": "pet-material-review v1.0.0",
+  "payload": {
+    "phase": "language",
+    "executionMode": "hybrid",
+    "elementKinds": [
+      "word",
+      "sentence",
+      "question",
+      "task",
+      "image",
+      "audio",
+      "answer_key"
+    ],
+    "materials": [
+      "all"
+    ],
+    "reviewListRefs": [
+      "SB03",
+      "SB04",
+      "SB05",
+      "SB06",
+      "SB07",
+      "SB08",
+      "SB09",
+      "SB10",
+      "SB11",
+      "SB12",
+      "SB13",
+      "SB14",
+      "SB15",
+      "SB16",
+      "WB03",
+      "WB04",
+      "WB05",
+      "WB06",
+      "WB07",
+      "WB08",
+      "WB09",
+      "WB10",
+      "WB11",
+      "WB12",
+      "VS03",
+      "VS04",
+      "VS05",
+      "VS06",
+      "VS07",
+      "VS08",
+      "VS09",
+      "VS10",
+      "KL03",
+      "KL04",
+      "KL05",
+      "KL06",
+      "KL07",
+      "KL08",
+      "GLOBAL-BRITISH"
+    ],
+    "standardRefs": [
+      "references/review-standards.md:3、3.1",
+      "references/grammar-review.md:通用语法审校门槛"
+    ],
+    "sourceSkillRef": "pet-material-review v1.0.0#LANG-001"
+  },
+  "id": "afa0e83d-b9df-5cb5-a3a9-2fb7d60ce9a1",
+  "created_at": "2026-10-08T00:00:00.000Z",
+  "updated_at": "2026-10-08T00:00:00.000Z"
+}

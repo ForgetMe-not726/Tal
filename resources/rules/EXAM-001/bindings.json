@@ -1,0 +1,35 @@
+[
+  {
+    "rule_id": "dd0dbdeb-a3d5-5ff9-ae52-5f6d831271eb",
+    "scope": "book",
+    "project_id": null,
+    "grade": null,
+    "book_type": "student",
+    "module_key": null,
+    "lesson_id": null,
+    "id": "4c966814-07cc-5600-a670-29dd0895e89a",
+    "created_at": "2026-10-08T00:00:00.000Z"
+  },
+  {
+    "rule_id": "dd0dbdeb-a3d5-5ff9-ae52-5f6d831271eb",
+    "scope": "book",
+    "project_id": null,
+    "grade": null,
+    "book_type": "workbook",
+    "module_key": null,
+    "lesson_id": null,
+    "id": "bbf44636-2b43-506d-aa1a-32e60c706cdb",
+    "created_at": "2026-10-08T00:00:00.000Z"
+  },
+  {
+    "rule_id": "dd0dbdeb-a3d5-5ff9-ae52-5f6d831271eb",
+    "scope": "book",
+    "project_id": null,
+    "grade": null,
+    "book_type": "vocab",
+    "module_key": null,
+    "lesson_id": null,
+    "id": "e801857b-1f58-587c-ab1b-ac5dfed64b3b",
+    "created_at": "2026-10-08T00:00:00.000Z"
+  }
+]

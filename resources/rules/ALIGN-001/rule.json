@@ -1,0 +1,44 @@
+{
+  "rule_key": "ALIGN-001",
+  "display_name": "目标、教学内容与练习双向对齐",
+  "rule_type": "review",
+  "is_hard": true,
+  "description": "pet-material-review v1.0.0",
+  "payload": {
+    "phase": "alignment",
+    "executionMode": "hybrid",
+    "elementKinds": [
+      "task",
+      "question",
+      "cross_reference",
+      "global"
+    ],
+    "materials": [
+      "all"
+    ],
+    "reviewListRefs": [
+      "SB06",
+      "SB13",
+      "SB14",
+      "SB16",
+      "WB09",
+      "WB10",
+      "WB12",
+      "VS08",
+      "VS09",
+      "VS10",
+      "KL05",
+      "KL06",
+      "KL07",
+      "KL08"
+    ],
+    "standardRefs": [
+      "references/review-standards.md:2、4.1",
+      "references/grammar-review.md:当课语法点—练习题覆盖审查"
+    ],
+    "sourceSkillRef": "pet-material-review v1.0.0#ALIGN-001"
+  },
+  "id": "b7b6205d-0443-59a1-a624-601ecbe36281",
+  "created_at": "2026-10-08T00:00:00.000Z",
+  "updated_at": "2026-10-08T00:00:00.000Z"
+}

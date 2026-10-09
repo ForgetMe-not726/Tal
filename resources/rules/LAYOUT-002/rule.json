@@ -1,0 +1,40 @@
+{
+  "rule_key": "LAYOUT-002",
+  "display_name": "答案线、空格和答案单位容量",
+  "rule_type": "review",
+  "is_hard": false,
+  "description": "pet-material-review v1.0.0",
+  "payload": {
+    "phase": "layout",
+    "executionMode": "hybrid",
+    "elementKinds": [
+      "question",
+      "task",
+      "page"
+    ],
+    "materials": [
+      "all"
+    ],
+    "reviewListRefs": [
+      "SB09",
+      "SB12",
+      "SB14",
+      "SB16",
+      "WB08",
+      "WB09",
+      "WB10",
+      "WB11",
+      "VS08",
+      "VS09",
+      "VS10"
+    ],
+    "standardRefs": [
+      "references/review-standards.md:5.2",
+      "references/review-list.md:各教材作答空间要求"
+    ],
+    "sourceSkillRef": "pet-material-review v1.0.0#LAYOUT-002"
+  },
+  "id": "9384ac9f-6411-53b3-a525-36ae02dc13d1",
+  "created_at": "2026-10-08T00:00:00.000Z",
+  "updated_at": "2026-10-08T00:00:00.000Z"
+}

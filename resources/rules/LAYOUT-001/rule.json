@@ -1,0 +1,64 @@
+{
+  "rule_key": "LAYOUT-001",
+  "display_name": "阅读顺序、换行、对齐与页间连续",
+  "rule_type": "review",
+  "is_hard": true,
+  "description": "pet-material-review v1.0.0",
+  "payload": {
+    "phase": "layout",
+    "executionMode": "human_visual",
+    "elementKinds": [
+      "page",
+      "task",
+      "question",
+      "word",
+      "sentence",
+      "image"
+    ],
+    "materials": [
+      "all"
+    ],
+    "reviewListRefs": [
+      "SB04",
+      "SB05",
+      "SB06",
+      "SB08",
+      "SB10",
+      "SB11",
+      "SB12",
+      "SB13",
+      "SB14",
+      "SB15",
+      "SB16",
+      "WB04",
+      "WB05",
+      "WB06",
+      "WB07",
+      "WB08",
+      "WB09",
+      "WB10",
+      "WB11",
+      "VS04",
+      "VS05",
+      "VS06",
+      "VS07",
+      "VS08",
+      "VS09",
+      "VS10",
+      "KL03",
+      "KL04",
+      "KL05",
+      "KL06",
+      "KL07",
+      "KL08"
+    ],
+    "standardRefs": [
+      "references/review-standards.md:2.1、5.5",
+      "references/delivery-and-sources.md:视觉三轮"
+    ],
+    "sourceSkillRef": "pet-material-review v1.0.0#LAYOUT-001"
+  },
+  "id": "7b94c74b-1c14-5687-a535-6731c2cd9bed",
+  "created_at": "2026-10-08T00:00:00.000Z",
+  "updated_at": "2026-10-08T00:00:00.000Z"
+}

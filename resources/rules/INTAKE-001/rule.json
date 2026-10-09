@@ -1,0 +1,33 @@
+{
+  "rule_key": "INTAKE-001",
+  "display_name": "确认教材、课次与版本角色",
+  "rule_type": "review",
+  "is_hard": false,
+  "description": "pet-material-review v1.0.0",
+  "payload": {
+    "phase": "intake",
+    "executionMode": "model_assisted",
+    "elementKinds": [
+      "document"
+    ],
+    "materials": [
+      "all"
+    ],
+    "reviewListRefs": [
+      "SB03",
+      "WB03",
+      "VS03",
+      "KL03",
+      "WB04",
+      "KL04"
+    ],
+    "standardRefs": [
+      "SKILL.md:资产、版本与范围",
+      "references/delivery-and-sources.md:双版本比对"
+    ],
+    "sourceSkillRef": "pet-material-review v1.0.0#INTAKE-001"
+  },
+  "id": "66e0f30b-bd75-5736-a3eb-3c1972f1aa53",
+  "created_at": "2026-10-08T00:00:00.000Z",
+  "updated_at": "2026-10-08T00:00:00.000Z"
+}
