@@ -1,40 +1,75 @@
-# 移交手册(Handover)
+# 本地版移交与发布手册
 
-> 目标:任何人按本手册可在自己的账号与电脑上完整重建并接管本项目。
-> 核心原则:**代码与数据库结构活在 git 仓库里,数据活在 Supabase 云上**——两者移交路径不同,缺一不可。
+> 本手册适用于 profile.md V1.2 之后的本地个人工具。当前 Next.js / Supabase 原型只作为迁移参考，不能按旧的云端移交流程发布给老师。
 
-## 一、资产清单与移交方式
+## 1. 交付资产
 
-| 资产 | 位置 | 移交方式 |
+| 资产 | 正式交付方式 | 不能交给老师做的事 |
 | --- | --- | --- |
-| 代码 / 文档 / 数据库迁移 | GitHub · https://github.com/ForgetMe-not726/Tal | 添加协作者或转移仓库所有权 |
-| 数据库(表结构 + 数据) | Supabase 项目(云) | 邀请进 Organization / 转移 Owner;或 `pg_dump` 导出交付 |
-| 文件(PDF、图片、DOCX) | Supabase Storage | Storage 单独导出(**不在 pg_dump 范围内**) |
-| 密钥(Supabase Key、AI 网关 Key 等) | `.env.local` / Vercel 环境变量 | 密码管理器等安全渠道交付;**移交后轮换全部旧 Key** |
-| 部署 | Vercel | Transfer Project 至对方团队,或对方拿代码自行重新部署 |
+| 桌面应用 | Windows x64 安装包 | 安装 Node.js、Python 或数据库 |
+| OCR Worker 与模型 | 随安装包或应用内模型包交付 | 手工下载模型、配置命令行 |
+| 教材项目 | 本地工作区文件夹 | 导入远程数据库 |
+| 规则与参考资料 | 工作区内可复制的 Markdown / JSON / 原始文件 | 编辑环境变量 |
+| 审校结果与报告 | `findings.json`、老师决定和可重建的静态 HTML | 手工拼接或执行模型生成的网页脚本 |
+| 本地检索 | 可重建索引、来源定位与页图证据 | 把内部索引当作唯一资料源 |
+| AI Gateway 凭据 | 发布配置或系统凭据库 | 写入项目文件或 git |
 
-## 二、新维护者接手步骤
+## 2. 新电脑验收
 
-1. 克隆仓库,执行 `npm install`。
-2. 复制 `.env.example` 为 `.env.local`,向原维护者索取真实值并填入。
-3. 数据库重建(二选一):
-   - **接管现有项目**:`npx supabase init`(仅首次,生成 config.toml)→ `npx supabase link --project-ref <项目ref>` → `npx supabase db push` 按 `supabase/migrations/` 顺序建表;
-   - **全新项目**:同上;或直接在 Supabase SQL Editor 中按文件名顺序执行 `supabase/migrations/*.sql`,再执行 `supabase/seed.sql`(示例数据,可选)。
-4. `npm run dev` 启动,验证首页与工作台可用。
-5. 接管 Supabase Organization 与 Vercel 项目所有权(见上表)。
+在一台未装开发环境的 Windows x64 电脑上：
 
-## 三、数据库维护红线
+1. 运行安装包；
+2. 从桌面打开应用；
+3. 确认应用自动创建本地工作区；
+4. 导入扫描 PDF，完成一次 OCR 并查看页图、文本、表格和图片；
+5. 确认来源，生成并保存一个 Module Draft；
+6. 对 Module 提出自然语言修改要求，查看并采用一条有规则和来源依据的建议；
+7. 在独立审校页面完成一次审校，在软件内生成并查看 HTML 报告；
+8. 用通用助手定位一个知识点并查看原书页图；
+9. 导出 DOCX；
+10. 复制整个工作区到另一台已安装应用的电脑，确认可继续打开。
 
-- **所有表结构变更必须通过 `supabase/migrations/` 下的 SQL 迁移文件进入 git**,禁止只在 Supabase 控制台手工改表——否则数据库将无法从仓库重建,移交即断链。
-- 全新环境 = `supabase db push` + `seed.sql`,应当能一键得到完整可用的数据库。
-- 规则库初始内容见 `seed.sql`(由前端原型中的示例规则迁移而来),真实教研规则由老师通过系统界面录入并版本化。
+上述过程不得要求终端、Python、Node、数据库、端口、环境变量或模型路径。
 
-## 四、密钥清单
+## 3. 工作区备份与恢复
 
-见根目录 `.env.example`,各条目含义已注释。真实值通过安全渠道移交,**任何密钥不得提交进 git**(`.gitignore` 已拦截)。
+- 工作区是教材、规则、OCR 结果、版本和导出物的唯一事实源；
+- 备份时完整复制工作区，保留 sources/originals、sources/ocr、rules、references、lessons、exports 和 .app；
+- .app/index.json 等索引可以重建，但原件、manifest、正文、结构 JSON 和版本文件不能缺失；
+- 项目删除默认进入工作区回收区；除非用户明确确认，不删除原始教材和导出文件。
 
-## 五、移交后的安全动作
+## 4. 依赖与许可证
 
-1. 轮换:Supabase `service_role` key、AI 网关 API Key、Vercel Token。
-2. 按需移除原维护者对 Supabase Organization、Vercel、git 仓库的访问。
-3. 在 git 仓库更新 `AGENTS.md` 工作记录,注明接管日期与接管人。
+每个发布版本应附带依赖清单，至少记录：
+
+- 桌面壳与前端版本；
+- OCR Worker、PaddleOCR、模型、PDF 渲染组件的版本与许可证；
+- 任何可选 OCR 引擎的启用状态；
+- DOCX、AI Gateway 客户端和其他第三方库的版本。
+
+MinerU 或其他带附加许可的 OCR 引擎，未经公司确认不得放入安装包。
+
+### 资料识别（Local-1）的实测依赖
+
+| 依赖 | 版本 | 许可 | 状态 |
+| --- | --- | --- | --- |
+| MinerU（本机 venv，`~/.venvs/mineru`） | 3.4.5 | Apache-2.0 + 附加条款（商用与分发允许，门槛远未触及） | **仅本机调用**，未随包分发；随包前走 Q-CORE-012 |
+| pypdfium2（渲染整页页图） | 5.10.1 | Apache-2.0 / BSD 系 | 随 venv 提供；随包分发前同样逐项核验 |
+| MinerU 所带模型（PDF-Extract-Kit、MinerU2.5-Pro） | 见 `~/mineru.json` | 需逐项归档 | Q-CORE-012 / Q-CORE-020 |
+
+引擎路径由环境变量 `MINERU_HOME` 指定（默认 `~/.venvs/mineru`）。安装包阶段这一层要换成
+随包 sidecar——`lib/ocr/mineru.ts` 是唯一需要改的地方，业务层不动。
+
+## 5. 当前原型的迁移提醒
+
+当前仓库中仍包含 Next.js API、Supabase migration、Mock Store 与环境变量示例。它们是旧原型的实现资产，后续本地化开发要逐步替换，不得把 Supabase 密钥、远程数据库或对外 API 一并带入正式老师安装包。
+
+用户后续提供的审校 Skill 与本地检索工具也属于迁移资产。交接时必须记录其原始版本、许可证、迁移映射、adapter 版本和评测结果，不能只留下已改写后的提示词或不可重建索引。
+
+## 6. 开发工具状态
+
+- Impeccable 已于 2026-09-22 从官方 GitHub 仓库的 `skill-v4.3.1` 标签更新到 4.3.1。
+- 更新包通过 GitHub Skill Installer 下载；安装前核对了 `SKILL.md` 版本、内部文档链接、Windows 启动器和文件清单。
+- 原 4.1.1 目录已移出活动技能目录，保存在 `.agents/skill-backups/impeccable-4.1.1-20260922`；确认新版稳定后再决定是否删除。
+- 新版 `impeccable.cmd context --target PRODUCT.md` 健康检查已通过。当前项目没有启用自动设计 hook；UI 实现完成后需按新版提示手动运行 detector，或另行启用 hook。
+- 新版检查指出 PRODUCT.md 仍是旧 schema。只能在用户确认后运行 Impeccable `init`，由访谈补齐 Positioning、Operating Context、Evidence on Hand 和 Product Principles；不能从现有内容擅自推断改写。

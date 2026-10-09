@@ -1,84 +1,80 @@
-# AI 教材智能迁移与审校平台 · 工作区指令
+# AI 教材智能迁移与审校工具 · 工作区指令
 
-## 权威方案
+> 同步基线：profile.md V1.2，2026-09-22。
 
-- **`profile.md` 是唯一权威的产品与技术总体方案（V1.0）**，已于 2026-09-01 经需求方逐条确认。所有产品形态、业务流程、数据模型与架构决策以该文件为准；与它冲突的旧文档一律失效。
-- 2026-09-01 之前的访谈台账、ADR、领域模型草案、术语表、审校 Skill 评估和原型生成 prompt 已归档至 `_archive/pre-profile-docs-2026-09-01/`，仅供历史追溯，不作为实现依据。
+## 权威文档与读取顺序
 
-## 核心定位与原则（摘要，全文见 profile.md）
+1. [profile.md](profile.md) 是产品和技术总体方案的唯一权威来源。涉及本地化、文件存储、OCR、生成、审校或部署时必须先读。
+2. [PRODUCT.md](PRODUCT.md) 定义老师可见的功能、状态与界面边界；处理产品流程或前端信息架构时必须读。
+3. [docs/OCR-ENGINE-DECISION.md](docs/OCR-ENGINE-DECISION.md) 定义 OCR 引擎、输出契约、人工确认和质量评测；处理 PDF、图片、OCR、模型打包或 sidecar 时必须读。
+4. [docs/REVIEW-SKILL-INTEGRATION.md](docs/REVIEW-SKILL-INTEGRATION.md) 定义审校 Skill 迁移、Finding 和 HTML 报告契约；处理审校规则、报告或审校页面时必须读。
+5. [docs/AI-ASSISTANT-RETRIEVAL.md](docs/AI-ASSISTANT-RETRIEVAL.md) 定义修改建议、通用助手、Context Pack、检索和 PDF 证据契约；处理 AI 建议或本地检索时必须读。
+6. [question.md](question.md) 是所有尚未解决、需要教研 / 需求方 / IT 确认事项的唯一台账。
+7. [docs/HANDOVER.md](docs/HANDOVER.md) 定义交付和重建要求；处理安装包、工作区、凭据或发布时必须读。
 
-- 定位：**AI 辅助教材迁移、优化、协同制作与审校平台**，不是从零创作的 AI 写作工具。
-- 最高生产原则：**Preserve → Adapt → Generate**——能沿用的原样迁移，不符合新版结构/标准的改写，只有旧版缺失时才生成新内容。
-- 六条总原则：确定性优先于智能；结构化优先于 Prompt；规则优先于模型知识；人工确认优先于 AI；建议优先于自动修改；**Workflow 控制 AI，而不是 AI 控制 Workflow**。
+早于 2026-09-21 的协作平台 / Supabase / 远程 API 方案只可作为历史与迁移参考。若与 profile.md 冲突，以 profile.md 为准。
 
-## 工程原则（2026-09-02，需求方确认）
+## 产品锚点
 
-1. **库内容即插即用**：灵活修改和切换知识库与规则库是本项目的关键功能。正式数据库内容敲定之前，程序设计必须为库内容预留充分空间（稳定 ID + 作用域绑定 + JSONB 扩展字段 + 版本化），保证内容到位后即插即用；严禁把具体规则/知识内容写死进代码。
-2. **面向非技术用户**：目标用户不懂代码。在完整实现功能的前提下，尽量简化代码结构与前端操作逻辑，界面语言使用教研术语而非工程术语，便于使用和维护。
-3. **可移交性**：项目开发后期将整体移交，开发全程遵循 `docs/HANDOVER.md` 约定（表结构走 migrations 进 git、密钥不进库、文档同步更新）。此条重要性最低，不得影响开发效果与进度。
+- 产品是安装到老师电脑上的本地个人工具，不是多人 Web 协作平台。
+- 每位老师只操作自己的本地工作区；项目隔离依赖目录边界，不依赖用户、角色或数据库隔离。
+- 本地文件是唯一事实源。原始教材、OCR 结果、规则、剑桥资料、版本、审校记录和 DOCX 都写入工作区。
+- 没有远程教材数据库、对外 REST API、账户体系、协作锁、跨用户审计或远程任务队列。
+- OCR、生成和审校是本机后台任务；界面可关闭任务面板但不能丢失可恢复的任务结果。
+- 资料识别、教材制作、教材审校是并列一级功能；通用助手位于主页且默认只读。
+- 最高教材原则：Preserve → Adapt → Generate。人工确认 > Lesson Context > 规则 > 已确认来源 > 模型知识。
+- 新版目标术语使用 Lesson；旧版来源中的 Unit 仅在原文与 provenance 中保留。
 
-## 已确认的核心决策
+## 实施基线
 
-- 业务层级：`Project → Grade → Term/Course → Lesson → 四书 → Module`；最小生成单位是 **Module**（一次生成一个完整模块，不逐段生成）。
-- 四书 = 学生用书（主书）、练习册、知识清单、单词小超市。生产顺序：学生用书制作并 Confirmed → 系统提取生成 **Lesson Context** → 老师轻量确认 → 其余三书同时参考旧版对应书稿、Lesson Context、已确认学生用书和规则生成。
-- Lesson Context 是四书共享事实源，当前字段：Theme / Core Vocabulary / Grammar（后续可扩展 phonics、交际功能、文化点、学习目标、Cambridge mapping）。
-- 信息优先级：人工确认 > Lesson Context > 项目/课程规则 > 模块规则 > 旧版教材 > 剑桥参考资料 > 模型自身知识。AI 不得推翻人工确认内容。
-- 旧教材知识库不做朴素 RAG（PDF→OCR→Chunk→Embedding 猜检索）。建独立的**教材加工后台**：上传扫描 PDF → OCR+Vision → 页面结构识别 → Lesson/Module 切分 → 文字与图片提取 → 人工快速确认 → 入库；正式生产用 **Structured Retrieval + RAG**。
-- 图片 MVP 只识别、保存、迁移（Asset 表记录来源页码、Lesson、Module 与图文关联），不做 AI 重绘。
-- 新旧模块映射存在一对一/一对多/多对一，用 **ModuleMapping** 多条记录表达，不写死一对一。
-- 规则 = 人类可读说明 + 机器可读约束。程序能确定的事（字数、题量、答案存在性、核心词汇覆盖、英式拼写、格式结构）用确定性检查；AI 只判断难度、自然度、连贯性、教学目的。形成 **Deterministic Check + LLM Review** 双层审校。
-- 规则作用域：Global / Project / Grade / Book / Module / Lesson Override；**Hard Rule** 不可被下级覆盖；Rule Resolver 为每次任务构建 Effective Rule Set。
-- 规则必须版本化（Draft / Published / Deprecated，旧版本永久保留）；生成任务记录 rule_id + rule_version + rule_snapshot 以支持历史复现；规则更新绝不自动修改已有教材，只提示"基于旧版规则生成"并提供重新检查入口。
-- 生成管线 11 步：Identify → Mapping Resolver → Source Retriever → Context Builder → Rule Resolver → Cambridge Retriever → Migration Planner → Generator → Validator → Save Version → AI Suggestions。先产出 **Migration Plan**（reuse/adapt/generate 的 JSON），再正式生成，防止 AI 拿到旧教材后全部重写。
-- 内容块后台必须记录来源类型 COPY / ADAPT / GENERATE 与来源定位（前台不必展示）；用于统计复用率与审计。
-- AI 优化建议与正文**分离存储**（正文 + AI 建议旁栏），老师点击"接受"才修改正文；四书同步一律 **Suggest，不 Auto Apply**。
-- 编辑器：浏览器端用 **Tiptap/ProseMirror 类 Word-like 富文本编辑器**，数据库存 Editor JSON；导出走 Editor JSON → DOCX Generator，DOCX 交独立排版团队。
-- 版本机制：AI 重生成永远产生新 Module Version，绝不覆盖人工修改稿；支持查看历史、对比版本、恢复版本。
-- 模块状态机：Draft → Editing → Confirmed；Confirmed 后再编辑进入 Modified，系统提示可能影响的关联书种，但不自动修改。
-- 多人协作 MVP 用 **Module Edit Lock**（locked_by / locked_at / lock_expire_at）+ Audit Log（谁、何时、改了什么、前后值），不做实时协同。
-- 整课状态机：Not Started → In Production → Student Book Confirmed → Four Books Completed → Reviewing → Human Review → Approved → Archived；四书全部完成才显示"提交审校"按钮。
-- 整课审校是一条 **Pipeline**（Preprocessor → Rule Checks → Cross-book Checks → Cambridge Checks → Language Checks → LLM Review → Finding Aggregator → Human Review），不是一个 Prompt。
-- 审校产出独立结构化 **Finding**（finding_id、书种、模块、位置、rule_id、severity、problem、evidence、suggestion、replacement_text、confidence、status：Open/Accepted/Rejected/Fixed/Recheck Required），支持"点击问题 → 定位正文 → 查看证据 → 应用建议"。
-- 审校允许 **INSUFFICIENT_EVIDENCE**，涉及剑桥要求、授权材料、课程标准而资料不足时不得硬猜。
-- 知识库分三层：Production Source（旧版公司教材，迁移用，权重最高）/ Authoritative Standards（Cambridge 官方大纲、CEFR、词表）/ Reference Materials（真题、教辅，仅参考不等权）。
-- AI 架构：Workflow Orchestrator 统一调度能力节点（Source Retriever、Context Builder、Rule Resolver、Cambridge Retriever、Migration Planner、Content Generator、Suggestion Generator、Review Engine）；Agent 只能放在节点内部，不能决定流程走向。
-- 模型路由 MVP 只配置 default_generation_model / default_review_model / vision_model，记录 provider、model、prompt_version、temperature、token_usage、latency；不提前做自动路由/成本优化。
-- 从第一天记录生产数据：生成/编辑/审校时长、copy/adapt/generate 比例、建议接受与拒绝数、finding 数与人工复核准确率。
+- 现有 Next.js / Supabase 原型是 UI、规则、检索、编辑和 DOCX 逻辑的迁移来源，不是正式运行时架构。
+- 正式交付是 Windows x64 一键安装包：老师不安装 Node、Python、数据库或 OCR 命令，不编辑环境变量。
+- 推荐的目标形态是桌面壳 + 本地命令桥 + 本地工作区 + OCR sidecar；业务层不得再以 Supabase 或 Next REST API 为依赖。
+- 默认 OCR 引擎为 MinerU（见 profile §5.2），PaddleOCR 作对照候选。必须通过 adapter 产出稳定的 manifest、Markdown、结构 JSON、页图和资产；不得把上游专有格式扩散到教材业务层。
+- Docling 仅作备选和质量对比；任何引擎随安装包分发前，其代码与所带模型许可都必须逐项核验并走公司确认（Q-CORE-012）。
 
-## MVP 范围
+## 项目共识
 
-- 只做**教材迁移闭环**：旧教材预处理 → 建 Module Mapping → 配置规则 → 选 Lesson → 生成学生用书模块 → 人工修改 → Confirmed → 生成 Lesson Context → 其余三书 → 四书完成 → AI Review → 结构化 Findings → 人工复核 → Approved → DOCX 导出。
-- 暂不做（profile.md 第三十四节）：AI 自动修改规则、反馈自动训练、Multi-Agent 自主讨论、实时多人编辑、自动换模型、AI 生成教材图片、复杂成本路由、全部门复杂权限、AI 自主决定流程、AI 自动修改其他三书。
-- 试点规模：先 **1 个年级 + 2~3 个 Lesson**，不一次性处理全部教材。
+- 业务层级：Project → Grade → Term/Course → Lesson → 四书 → Module；最小生成单位是完整 Module。
+- 四书：学生用书、练习册、知识清单、单词小超市。学生用书确认后构建 Lesson Context，其余三书参考主书、上下文、旧版来源和规则。
+- 规则是“人类可读说明 + 机器可读约束”，支持 Global / Project / Grade / Book / Module / Lesson Override，Hard Rule 不可被低层覆盖，且必须版本化与快照化。
+- 旧教材正式生产使用 Structured Retrieval + 可替换的本地语义检索；不得用整本 PDF 的朴素 RAG 猜来源。
+- OCR 结果在老师确认前不是 Production Source；图片只识别、保存和迁移，不做 AI 重绘。
+- 正文与 AI 建议分离；接受建议与人工修改均生成新版本，绝不覆盖历史。
+- 审校是本地 Pipeline，产出可定位的结构化 Finding；资料不足时允许 INSUFFICIENT_EVIDENCE。
+- `findings.json` 是审校事实源，HTML 报告由结构化结果和老师决定生成，不让模型自由输出整页 HTML。
+- 修改建议助手只作用于当前 Module；自然语言请求必须使用带规则 ID 和来源定位的最小 Context Pack，采用建议后才生成新版本。
+- 用户后续提供的审校 Skill 和本地检索代码都是迁移来源，必须分别通过规则转换层和 adapter 接入，不把旧内容或内部索引格式直接扩散到业务层。
 
-## 技术栈
+## 待确认事项台账
 
-- 前端：Next.js (App Router) + TypeScript + Tailwind CSS + shadcn/ui + Tiptap/ProseMirror。
-- 后端：MVP 用 Next.js Server，任务复杂后再考虑独立 Python FastAPI（现在不拆）；数据库 PostgreSQL/Supabase；存储 Supabase Storage / S3（PDF、图片、DOCX）。
-- AI：统一 **AI Gateway**，业务代码不直接绑某一家模型；队列早期 Supabase + background worker，规模大后再 Redis + BullMQ/Celery；部署 Vercel + Supabase + Worker。
+- 发现必须由教研、需求方或 IT 拍板的事项，立即追加到 question.md，不只留在聊天记录。
+- 编号使用 Q-CORE / Q-KL / Q-SB / Q-WB / Q-VB / Q-PB 加序号。
+- 每条必须有归属、影响与当前默认处置。
+- 结论确认后，先写回 profile、规则、映射或代码，再将问题移到 question.md 的“已确认”区并标注日期；不直接删除。
+- 每次结束开发会话前核对 question.md 与实际实现、规则和草稿一致。
 
-## 开发顺序（Phase 0–7）
+## 文档和工程规则
 
-0. **规则工程**：新版结构表、模块清单、旧→新 Mapping、规则层级、Hard/Module/审校规则——没做清楚不要大量写码
-1. **旧教材加工**：PDF Upload / OCR / Vision / 切分 / 图片提取 / 人工确认
-2. **单模块迁移**：只做 Student Book · Let's explore!，验证 旧教材+Mapping+Rules → 新版 Draft（第一个生死节点）
-3. **Editor + Version**：富文本编辑器、版本历史、Confirm、Edit Lock、Audit Log
-4. **Lesson Context**：学生用书 Confirmed → AI 提取 → 老师确认
-5. **四书**：扩展到全部书种 + Cross-book suggestions
-6. **Review**：审校 Skill 改造为 Structured Findings；Rule Checks + LLM Review + Cross-book Review
-7. **DOCX + Pilot**：导出 DOCX，10~20 个真实 Lesson 试点后决定推广
+- 新的产品决策先更新 profile.md；用户体验细节更新 PRODUCT.md；OCR 选择与质量结论更新 docs/OCR-ENGINE-DECISION.md。
+- 不把具体教材规则、知识内容、路径或模型名写死进业务代码；它们必须可由本地工作区的文件与 manifest 替换。
+- 未经用户明确授权，不改写或删除老师工作区中的教材原件。批量变更前先显示精确范围。
+- 本地索引、缓存和预览可删除且可重建，不能成为唯一事实源。
+- 安装包、运行时、OCR 模型和第三方依赖必须记录版本和许可证；密钥只存系统凭据库或发布配置，不进工作区和 git。
+- 每完成一个产品模块，按 workflow.md 先做模块孤立复核，再做全产品集成复核；记录发现和验证结果后再进入下一模块。
 
-## 当前实现状态与已知差距
+## 当前阶段与完成标准
 
-- 前端原型已迁入本项目：Next.js 16 + React 19 + TypeScript + Tailwind CSS 4，仍为纯 Mock 交互。
-- 数据库迁移（curriculum / rules / knowledge）与 AI Gateway 双模式代码已就位：待 Supabase 项目创建并在 `.env.local` 填好环境变量后即可接入；AI Gateway 默认 mock 模式，无真实 Key 也能联调整条管线。
-- 原型中的 `Unit` 命名、同步 `setTimeout` 模拟生成、只读 Markdown 正文、模拟保存/导出均不是正式契约，实现时一律按 profile.md 修正。
-- 视觉系统见 `DESIGN.md`（出版排样台视觉语言），原型交互基线见 `PRODUCT.md`；二者仍适用于前端开发，但业务行为以 profile.md 为准。
-- 主要五大风险（profile.md 第三十七节）：扫描 PDF 解析质量、规则工程未开始、AI 过度改写、四书内容漂移、规则更新污染历史。
+旧 Web MVP 已完成并保留为迁移资产；当前正式产品处于 Local-0 / Local-1 规划阶段：先完成本地单人工具基座与 OCR 资料识别，再迁移教材制作和审校逻辑。
 
-## 工作记录
+本阶段的完成标准不是“页面能跑”，而是老师在新电脑上无需命令行和手工配置，即可导入扫描 PDF、查看并确认结构化 OCR、生成一个 Module Draft、保存版本并导出 DOCX。
 
-- 2026-08-26：完成两轮访谈并产出初始共识与 ADR（已归档至 `_archive/pre-profile-docs-2026-09-01/`）。
-- 2026-09-01：需求方确认 GPT 产出的总体方案 `profile.md` 为唯一权威方案，取代此前所有过程文档。
-- 2026-09-02：建立版本控制与移交机制（git 仓库、`.env.example`、`docs/HANDOVER.md`）；确认以现有示例规则先行搭建前后端，真实规则与知识库内容由教研老师整理到位后经系统界面录入，不做代码改动。
-- 2026-09-02：记录三条工程原则（库内容即插即用 / 面向非技术用户 / 可移交性）；动工第一批基础设施：curriculum、rules、knowledge 三组迁移 + seed 示例数据 + Supabase 服务端客户端 + AI Gateway（mock / anthropic-compatible 双模式）。
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

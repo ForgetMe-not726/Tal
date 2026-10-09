@@ -1,2089 +1,451 @@
-# AI 教材智能迁移与审校平台
-## 产品与技术总体方案 V1.0
+# AI 教材智能迁移与审校工具
+## 产品与技术总体方案 V1.2
 
-## 一、项目定位
+> 生效日期：2026-09-22
+> 本版覆盖：产品部署形态、数据边界、OCR、独立审校工作台、AI 修改建议与本地检索助手。
+> 保留原则：历史方案中未与本版冲突的教材迁移、规则、人工确认、版本与审校原则继续有效；本文件为唯一权威方案。
 
-本项目不应定位为“AI 自动生成教材 Agent”，而应定位为：
+## 1. 产品定位
 
-**AI 辅助教材迁移、优化、协同制作与审校平台。**
+本产品是面向教研老师个人使用的：
 
-项目核心目标不是从零创作教材，而是：
+**本地 AI 教材迁移、优化与审校工具。**
 
-> 在最大程度保留旧版教材优质内容的前提下，根据新版教材结构和教研规则，将旧版教材自动迁移为新版教材 Draft，并通过剑桥知识库、课程规则和 AI 审校能力提供优化建议，最终由教研人员完成确认。
+它不是多人协作平台，也不是从零写教材的通用 AI 写作工具。
 
-整个系统遵循最高生产原则：
+核心目标仍然是：
 
-**Preserve → Adapt → Generate**
+> 将老师本地持有的旧版教材、规则和剑桥参考资料加工为可追溯的本地知识资产；以新版结构和规则为约束，生成新版教材 Draft；由老师编辑、确认、审校并导出 DOCX。
 
-即：
+最高生产原则不变：
 
-1. 可以直接沿用的内容，优先原样迁移；
-2. 不符合新版结构或标准的内容，进行必要改写；
-3. 只有旧版缺失或明显不能满足新版要求时，才生成新内容。
-
-这也是系统区别于普通 AI 写作工具的核心。
-
----
-
-# 二、产品最终形态
-
-正式产品采用：
-
-**公司内部 Web 协作平台**
-
-而不是本地个人软件。
-
-开发阶段可以使用本地环境，但正式数据、规则、教材版本和任务状态统一存储在服务端。
-
-原因包括：
-
-- 多位老师会协作制作同一个 Lesson；
-- 需要记录每位老师修改过什么；
-- AI 生成结果需要保存历史版本；
-- 规则需要版本管理；
-- 四书之间存在联动；
-- 教材存在 Draft / Confirmed / Reviewed / Approved 等正式状态；
-- 后续可能推广至整个部门。
-
-因此推荐：
-
-**Browser → Next.js → Backend → PostgreSQL/Supabase → AI Gateway**
-
-初期几人使用时保持单体架构，不提前做复杂微服务。
-
----
-
-# 三、核心业务对象
-
-系统最重要的业务单位不是 Unit，而是：
-
-**Lesson**
-
-推荐正式层级：
-
-```text
-Project
-└── Grade
-    └── Term / Course
-        └── Lesson
-            ├── Student Book
-            │   ├── Let's explore!
-            │   ├── Let's say!
-            │   └── Let's read!
-            │
-            ├── Workbook
-            ├── Knowledge List
-            └── Vocabulary Book
-```
-
-系统的最小生成单位：
-
-**Module**
-
-即老师点击 Let's explore!，一次生成这一完整模块。
-
-不是逐段生成。
-
----
-
-# 四、四书生产顺序
-
-四书不是完全平级。
-
-确定：
-
-**学生用书为主书。**
-
-推荐生产顺序：
-
-```text
-旧版资料
-    ↓
-学生用书
-    ↓
-老师修改
-    ↓
-Confirmed
-    ↓
-Lesson Context
-    ↓
-其余三书
-    ↓
-四书完成
-    ↓
-整课审校
-```
-
-因此：
-
-### 第一阶段
-
-先制作 Student Book。
-
-### 第二阶段
-
-Student Book 确认后，系统提取：
-
-- Theme
-- Core Vocabulary
-- Grammar
-
-生成：
-
-**Lesson Context**
-
-### 第三阶段
-
-老师进行一次轻量确认。
-
-之后其他三书生成时：
-
-必须同时参考：
-
-1. 旧版对应书稿；
-2. Lesson Context；
-3. 已确认学生用书；
-4. 当前模块规则；
-5. 全局规则。
-
-这样可以显著降低“四本书各写各的”的问题。
-
----
-
-# 五、Lesson Context：四书共享事实源
-
-Lesson Context 是整个系统最重要的数据对象之一。
-
-例如：
-
-```text
-Lesson:
-L3 Winter Lesson 04
-
-Theme:
-At the Zoo
-
-Core Vocabulary:
-lion
-tiger
-elephant
-giraffe
-
-Grammar:
-What is it?
-It's a ...
-
-Confirmed by:
-Teacher A
-
-Version:
-3
-```
-
-四书需要保持一致的内容目前包括：
-
-- Theme
-- Core Vocabulary
-- Grammar
-
-未来可以扩展：
-
-- phonics
-- communicative functions
-- cultural points
-- learning objectives
-- Cambridge mapping
-
-Lesson Context 的优先级必须高于普通教材内容。
-
-即：
-
-```text
-人工确认
->
-Lesson Context
->
-项目/课程规则
->
-模块规则
->
-旧版教材
->
-剑桥参考资料
->
-模型自身知识
-```
-
-AI 不应自行推翻人工确认内容。
-
----
-
-# 六、旧版教材知识库不能直接做普通 RAG
-
-旧教材主要为：
-
-- 扫描 PDF
-- 图片
-- 表格
-- 文本框
-- 教材排版
-
-因此不应采用：
-
-```text
-PDF → OCR → Chunk → Embedding → RAG
-```
-
-然后每次生成教材都让 AI 猜应该找哪一块。
-
-教材本身具有高度结构化关系。
-
-推荐采用：
-
-# Structured Retrieval + RAG
-
-两个系统分别承担不同任务。
-
----
-
-# 七、旧教材结构化加工流水线
-
-建立独立的：
-
-**Knowledge Ingestion / 教材加工后台**
-
-旧教材上传后，只处理一次。
-
-流程：
-
-```text
-上传扫描 PDF
-        ↓
-OCR + Vision
-        ↓
-页面结构识别
-        ↓
-Lesson 切分
-        ↓
-Module 切分
-        ↓
-文字提取
-        ↓
-图片提取
-        ↓
-自动分类
-        ↓
-人工快速确认
-        ↓
-发布至知识库
-```
-
-例如最终知识库中不是：
-
-```text
-PDF 第23页的一段文字
-```
-
-而是：
-
-```text
-Project: L3 Winter
-Lesson: 01
-Book: Student Book
-Old Module: Hello World
-
-Text:
-...
-
-Images:
-image_001.png
-image_002.png
-```
-
-这样正式生产过程中不需要重复 OCR。
-
----
-
-# 八、图片处理原则
-
-MVP 阶段：
-
-**只负责识别、保存和迁移旧教材图片。**
-
-暂时不要加入 AI 重绘图片。
-
-例如：
-
-旧版：
-
-```text
-Hello World
-[动物园图片]
-
-Look at the picture...
-```
-
-迁移至新版：
-
-```text
-Let's explore!
-
-[原动物园图片]
-
-Look at the picture...
-```
-
-系统必须维护：
-
-```text
-Asset
-- asset_id
-- source_document
-- page
-- lesson
-- module
-- image_url
-- relation_to_text
-```
-
-这样图片不会在 OCR 过程中丢失。
-
----
-
-# 九、新旧模块映射不能写死成一对一
-
-已经确认存在：
-
-- 一对一
-- 一对多
-- 多对一
-
-因此必须单独建立：
-
-**Module Mapping**
-
-例如：
-
-```text
-Old:
-Hello World
-+
-Words
-
-        ↓
-
-New:
-Let's explore!
-```
-
-也可能：
-
-```text
-Old:
-Reading Time
-
-        ↓
-
-New:
-Let's explore!
-+
-Let's read!
-```
-
-数据库中不能简单保存：
-
-```text
-old_module_id → new_module_id
-```
-
-推荐建立 Mapping 表：
-
-```text
-ModuleMapping
-
-id
-project_id
-source_module_id
-target_module_id
-mapping_type
-priority
-notes
-```
-
-多条记录共同表达多对多关系。
-
----
-
-# 十、规则系统设计
-
-现有方案中 `Rules as Data` 的思想应该完整保留。
-
-但规则不能只是 Markdown 文件。
-
-应该升级为：
-
-# Rule = Human-readable Instruction + Machine-readable Constraints
-
-例如：
-
-```text
-Rule:
-Let's Read Word Count
-
-说明：
-Let's read 阅读文本长度应该为 120–150 words。
-
-Structured Constraint:
-
-min_words = 120
-max_words = 150
-```
-
-原因是：
-
-**程序能够确定的事情，不应该全部交给 AI 判断。**
-
-例如：
-
-适合程序检查：
-
-- 单词数
-- 题目数量
-- 是否存在答案
-- 是否包含核心词汇
-- 模块是否完整
-- 英式拼写词表匹配
-- 格式结构
-
-适合 AI 判断：
-
-- 难度是否合适
-- 表达是否自然
-- 上下文是否连贯
-- 是否符合教学目的
-- 题目是否真正检测目标知识
-
-形成：
-
-**Deterministic Check + LLM Review**
-
-双层审校。
-
----
-
-# 十一、规则作用域
-
-规则至少支持：
-
-```text
-Global
-Project
-Grade
-Book
-Module
-Lesson Override
-```
-
-同时把规则分成：
-
-### Hard Rule
-
-不可被下级规则覆盖。
-
-例如：
-
-- 英式英语
-- 公司内容安全要求
-- 教材红线
-
-### Scoped Rule
-
-允许更具体规则覆盖。
-
-例如：
-
-```text
-L3 reading
-120 words
-```
-
-但：
-
-```text
-L5 reading
-180 words
-```
-
-可以不同。
-
-建议解析逻辑：
-
-```text
-Global Hard Rules
-        ↓
-Lesson Override
-        ↓
-Module Rules
-        ↓
-Book Rules
-        ↓
-Grade Rules
-        ↓
-Project Defaults
-```
-
-最后由 Rule Resolver 为每次任务构建：
-
-**Effective Rule Set**
-
----
-
-# 十二、规则必须版本化
-
-不能：
-
-```text
-编辑 → 保存 → 覆盖
-```
-
-必须：
-
-```text
-Rule v1
-↓
-Rule v2
-↓
-Rule v3
-```
-
-状态：
-
-```text
-Draft
-Published
-Deprecated
-```
-
-团队即使平权，也不代表可以破坏历史。
-
-任何成员可以：
-
-- 创建新版本；
-- 编辑 Draft；
-- 发布版本。
-
-但旧版本永久保留。
-
-生成任务必须记录：
-
-```text
-rule_id
-rule_version
-rule_snapshot
-```
-
-从而实现历史复现。
-
-原方案已经有记录 `used_rules` 的意识，但正式版必须保存具体版本，而不是只保存规则名称。
-
----
-
-# 十三、规则更新后的教材处理
-
-规则更新绝不能自动修改已有教材。
-
-例如：
-
-```text
-Let's read
-生成时：Rule v3
-
-当前：Rule v4
-```
-
-界面显示：
-
-```text
-⚠ 当前内容基于旧版规则生成
-
-[查看规则变化]
-[使用最新版重新检查]
-```
-
-老师点击以后：
-
-生成新的 Review 或新的 ModuleVersion。
-
-原稿永不直接覆盖。
-
----
-
-# 十四、教材迁移生成 Pipeline
-
-老师点击：
-
-**Generate Let's explore!**
-
-后台启动异步任务。
-
-完整过程：
-
-```text
-1. Identify
-确定 Lesson / Book / Module
-
-        ↓
-
-2. Mapping Resolver
-查找旧版 → 新版映射
-
-        ↓
-
-3. Source Retriever
-精准取得旧版文字 + 图片
-
-        ↓
-
-4. Context Builder
-取得：
-Lesson Context
-Student Book confirmed content
-related modules
-
-        ↓
-
-5. Rule Resolver
-取得有效规则集
-
-        ↓
-
-6. Cambridge Retriever
-只检索与本模块真正相关的剑桥资料
-
-        ↓
-
-7. Migration Planner
-判断：
-COPY
-ADAPT
-GENERATE
-
-        ↓
-
-8. Generator
-生成新版模块 Draft
-
-        ↓
-
-9. Validator
-进行程序级结构检查
-
-        ↓
-
-10. Save Version
-保存 Module Version
-
-        ↓
-
-11. AI Suggestions
-生成独立优化建议
-```
-
----
-
-# 十五、AI 迁移不要直接“自由创作”
-
-模型内部应该先生成 Migration Plan。
-
-例如：
-
-```json
-{
-  "reuse": [
-    "paragraph_1",
-    "image_2"
-  ],
-  "adapt": [
-    {
-      "source": "paragraph_2",
-      "reason": "new structure requirement"
-    }
-  ],
-  "generate": [
-    {
-      "type": "warm_up_question",
-      "reason": "missing in old material"
-    }
-  ]
-}
-```
-
-然后再正式生成教材。
-
-这样系统更容易遵循：
-
-**Preserve → Adapt → Generate**
-
-而不是拿到旧教材以后全部重新写一遍。
-
----
-
-# 十六、生成结果要记录内容来源
-
-内部数据应记录：
-
-```text
-COPY
-ADAPT
-GENERATE
-```
-
-例如：
-
-```text
-Block 01
-
-origin_type:
-COPY
-
-source:
-old_L3_L01_HelloWorld_p2
-
-rule:
-LetsExplore_v4
-```
-
-用户前台不一定显示。
-
-后台必须记录。
-
-未来才能统计：
-
-- 多少内容直接迁移；
-- 多少内容 AI 改写；
-- 多少内容属于新生成。
-
-这也是判断系统价值的重要指标。
-
----
-
-# 十七、AI 优化与正文必须分离
-
-确定采用：
-
-**正文 + AI 建议旁栏**
-
-而不是模型自动修改正文。
-
-界面：
-
-```text
-┌───────────────────┬─────────────────────┐
-│                   │ AI Suggestions      │
-│                   │                     │
-│     教材正文      │ ① 建议修改...       │
-│                   │ [接受] [忽略]       │
-│                   │                     │
-│                   │ ② 建议增加...       │
-└───────────────────┴─────────────────────┘
-```
-
-AI 建议可能来源于：
-
-- 剑桥要求；
-- 新版规则；
-- 教材难度；
-- 内容质量；
-- 四书一致性。
-
-老师点击：
-
-**接受建议**
-
-才修改正文。
-
----
-
-# 十八、正文编辑器
-
-浏览器中不应该直接使用 DOCX 作为底层编辑格式。
-
-使用：
-
-**Word-like Rich Text Editor**
-
-底层建议：
-
-ProseMirror / Tiptap 类结构化编辑器。
-
-支持：
-
-- 字体
-- 字号
-- 粗体
-- 斜体
-- 下划线
-- 表格
-- 图片
-- 列表
-- 标题
-- 高亮
-- 评论
-- 撤销
-- 重做
-
-数据库保存：
-
-```text
-Editor JSON
-```
-
-最终：
-
-```text
-Editor JSON
-↓
-DOCX Generator
-↓
-.docx
-```
-
-内容生产团队使用系统制作内容。
-
-随后 DOCX 交给独立排版团队。
-
----
-
-# 十九、版本机制
-
-AI 重新生成绝不能覆盖原内容。
-
-例如：
-
-```text
-Let's explore!
-
-V1 AI Generated
-
-V2 Teacher Edited
-
-V3 AI Regenerated
-
-V4 Teacher Edited
-```
-
-系统保存完整历史。
-
-老师可以：
-
-- 查看历史；
-- 对比版本；
-- 恢复版本。
-
-尤其：
-
-老师修改 V1 后点击重新生成：
-
-**生成 V2，而不是覆盖老师修改稿。**
-
----
-
-# 二十、Module 状态机
-
-每个 Module：
-
-```text
-Draft
-↓
-Editing
-↓
-Confirmed
-```
-
-Confirmed 代表：
-
-**可以被其他教材作为正式上下文引用。**
-
-如果 Confirmed 后重新编辑：
-
-```text
-Confirmed
-↓
-Modified
-```
-
-系统提示：
-
-```text
-该模块已发生修改。
-
-可能影响：
-Workbook
-Knowledge List
-
-[查看关联模块]
-```
-
-但不能自动修改其他教材。
-
----
-
-# 二十一、四书同步策略
-
-确定：
-
-**Suggest，不 Auto Apply。**
-
-例如学生用书：
-
-```text
-Vocabulary:
-lion
-tiger
-elephant
-```
-
-老师修改：
-
-```text
-elephant → giraffe
-```
-
-系统检测：
-
-Workbook 中仍然存在 elephant。
-
-显示：
-
-```text
-Cross-book consistency suggestion
-
-Student Book:
-giraffe
-
-Workbook:
-elephant
-
-建议同步。
-
-[查看]
-[应用]
-[忽略]
-```
-
-绝不能直接修改 Workbook。
-
----
-
-# 二十二、多人协作
-
-MVP 不做 Google Docs 式实时共同编辑。
-
-采用：
-
-**Module Edit Lock**
-
-例如：
-
-```text
-Let's read!
-
-王老师正在编辑
-
-[只读查看]
-```
-
-王老师保存/退出后释放锁。
-
-后台记录：
-
-```text
-locked_by
-locked_at
-lock_expire_at
-```
-
-同时通过 Audit Log 记录：
-
-```text
-谁
-什么时候
-修改了什么
-修改前
-修改后
-```
-
-后期如果确实有需求，再升级实时协作。
-
----
-
-# 二十三、整课状态机
-
-Lesson 推荐状态：
-
-```text
-Not Started
-↓
-In Production
-↓
-Student Book Confirmed
-↓
-Four Books Completed
-↓
-Reviewing
-↓
-Human Review
-↓
-Approved
-↓
-Archived
-```
-
-中文前台可以显示：
-
-```text
-未开始
-制作中
-主书已确认
-四书完成
-AI审校中
-待人工复核
-已通过
-已归档
-```
-
-只有四书全部达到完成状态：
-
-才显示：
-
-**提交审校**
-
-按钮。
-
-这与现有方案中“四书工作包完成后投入整课审校”的业务原则一致。
-
----
-
-# 二十四、审校不是一个 Prompt，而是一条 Pipeline
-
-不要：
-
-```text
-四本教材
-↓
-“请帮我检查”
-↓
-LLM
-↓
-长报告
-```
-
-推荐：
-
-```text
-四书
-↓
-Preprocessor
-↓
-Rule Checks
-↓
-Cross-book Checks
-↓
-Cambridge Checks
-↓
-Language Checks
-↓
-LLM Review
-↓
-Finding Aggregator
-↓
-Human Review
-```
-
-原审校 Skill 可以作为这一系统的重要方法来源，但具体新版规则需要后续由专业老师重新确认；现有项目文档也已经明确现有 PET Skill 只能复用方法而不是直接作为新版规则基线。
-
----
-
-# 二十五、审校 Finding 结构
-
-不要直接保存：
-
-“一篇审校报告”。
-
-每个问题都是独立 Finding：
-
-```text
-finding_id
-
-lesson_id
-
-book:
-Student Book
-
-module:
-Let's read!
-
-location:
-Paragraph 3
-
-rule_id:
-VocabularyCoverage
-
-severity:
-Major
-
-problem:
-目标词汇覆盖不足
-
-evidence:
-核心词汇 giraffe 未出现
-
-suggestion:
-在第二段增加...
-
-replacement_text:
-...
-
-confidence:
-0.91
-
-status:
-Open
-```
-
-状态：
-
-```text
-Open
-Accepted
-Rejected
-Fixed
-Recheck Required
-```
-
-这样前端才能实现：
-
-**点击问题 → 定位正文 → 查看证据 → 应用建议。**
-
----
-
-# 二十六、审校必须允许“不确定”
-
-AI 不允许强制做判断。
-
-推荐：
-
-```text
-PASS
-FAIL
-WARNING
-INSUFFICIENT_EVIDENCE
-```
-
-尤其涉及：
-
-- 剑桥要求；
-- 授权材料；
-- 课程标准；
-- 信息不完整。
-
-如果资料不足：
-
-必须输出：
-
-**INSUFFICIENT_EVIDENCE**
-
-而不是模型自己猜。
-
----
-
-# 二十七、知识库需要分层
-
-不要把所有资料扔进一个 Vector Store。
-
-至少分：
-
-### 1. Production Source
-
-旧版公司教材。
-
-用途：
-
-**教材迁移。**
-
-权重极高。
-
----
-
-### 2. Authoritative Standards
-
-未来确定：
-
-- Cambridge 官方 syllabus
-- CEFR
-- 官方词表
-- 官方考试要求
-
-用途：
-
-**判断规范是否符合。**
-
----
-
-### 3. Reference Materials
-
-例如：
-
-- 真题
-- 教辅
-- 公司资料
-- 教研资料
-
-用途：
-
-**提供参考。**
-
-不能与官方标准拥有同等权重。
-
----
-
-# 二十八、数据库核心模型
-
-原来的三张表只能支持 Demo。
-
-正式系统建议至少存在以下核心对象：
-
-```text
-users
-
-projects
-
-lessons
-
-books
-
-modules
-
-module_versions
-
-lesson_contexts
-
-source_documents
-
-source_modules
-
-assets
-
-module_mappings
-
-rules
-
-rule_versions
-
-rule_bindings
-
-generation_jobs
-
-suggestions
-
-review_jobs
-
-findings
-
-audit_logs
-```
-
-关系简化如下：
-
-```text
-Project
-  ↓
-Lesson
-  ↓
-Book
-  ↓
-Module
-  ↓
-ModuleVersion
-```
-
-旁路：
-
-```text
-Rule → RuleVersion
-
-SourceDocument
-     ↓
-SourceModule
-     ↓
-ModuleMapping
-```
-
-以及：
-
-```text
-Lesson
-↓
-LessonContext
-```
-
----
-
-# 二十九、AI 架构
-
-不建议构建一个万能 Agent。
-
-推荐：
-
-```text
-Workflow Orchestrator
-        │
-        ├── Source Retriever
-        │
-        ├── Context Builder
-        │
-        ├── Rule Resolver
-        │
-        ├── Cambridge Retriever
-        │
-        ├── Migration Planner
-        │
-        ├── Content Generator
-        │
-        ├── Suggestion Generator
-        │
-        └── Review Engine
-```
-
-AI 是 Workflow 中的能力节点。
-
-Workflow 才是系统真正的控制者。
-
-这是整个项目最重要的架构原则：
-
-> **LLM 是流水线工人，不是流水线厂长。**
-
----
-
-# 三十、模型路由
-
-系统虽然可以支持 GPT、GLM 等多个公司 API，但 MVP 不要过早设计复杂自动模型路由。
-
-第一阶段建议：
-
-```text
-default_generation_model
-default_review_model
-vision_model
-```
-
-管理员配置。
-
-记录：
-
-```text
-provider
-model
-prompt_version
-temperature
-token_usage
-latency
-```
-
-后期才做：
-
-- 成本路由
-- fallback
-- A/B testing
-- 不同任务不同模型
-
----
-
-# 三十一、前端信息架构
-
-## A. Dashboard
-
-展示：
-
-- 我的 Lesson
-- 最近编辑
-- 待审校
-- 审校完成
-- 项目进度
-
----
-
-## B. Workbench
-
-建议最终采用四区结构：
-
-```text
-┌────────┬──────────────────────────────┬───────────────┐
-│Lesson  │                              │ AI / Review   │
-│Tree    │        Rich Editor           │ Suggestions   │
-│        │                              │               │
-│        │                              │               │
-└────────┴──────────────────────────────┴───────────────┘
-```
-
-顶部：
-
-```text
-L3 / Winter / Lesson 04
-Student Book
-Let's read!
-
-Draft / Confirmed
-Version 4
-```
-
----
-
-## C. Rules
-
-规则：
-
-```text
-Global
-Grade
-Book
-Module
-```
-
-显示：
-
-- 当前版本
-- Draft
-- Published
-- Version History
-- 谁修改
-- 修改时间
-
----
-
-## D. Knowledge Base
-
-包含：
-
-- Source Materials
-- Cambridge Sources
-- Processing Status
-
----
-
-## E. Review Center
-
-展示：
-
-```text
-Critical 2
-Major 5
-Minor 8
-Warning 3
-```
-
-可以按：
-
-- Book
-- Module
-- Rule
-- Severity
-
-过滤。
-
----
-
-# 三十二、系统应记录的生产数据
-
-从 MVP 第一天开始记录。
-
-不要求现在立刻制定目标值。
-
-至少记录：
-
-### Time
-
-```text
-generation_duration
-teacher_edit_duration
-review_duration
-```
-
-### Reuse
-
-```text
-copy_ratio
-adapt_ratio
-generated_ratio
-```
-
-### AI Suggestion
-
-```text
-suggestion_count
-accepted_count
-rejected_count
-```
-
-### Review
-
-```text
-finding_count
-human_confirmed_count
-false_positive_count
-```
-
-未来可以回答：
-
-> AI 到底帮我们省了多少时间？
-
-而不是：
-
-> 大家感觉挺方便。
-
----
-
-# 三十三、MVP 范围
-
-第一版绝对不要试图完成整个“AI 教研自动化平台”。
-
-只完成：
-
-# 教材迁移闭环
-
-完整 Demo：
-
-```text
-上传并预处理旧版教材
-        ↓
-建立新旧 Module Mapping
-        ↓
-配置新版 Rules
-        ↓
-选择 Lesson
-        ↓
-生成 Student Book Module
-        ↓
-人工修改
-        ↓
-Confirmed
-        ↓
-生成 Lesson Context
-        ↓
-制作其他三书
-        ↓
-四书完成
-        ↓
-提交 AI Review
-        ↓
-生成结构化 Findings
-        ↓
-人工复核
-        ↓
-Approved
-        ↓
-DOCX Export
-```
-
-做到这个闭环：
-
-MVP 就已经非常有价值。
-
----
-
-# 三十四、第一阶段暂时不要做
-
-以下功能全部放到第二阶段以后：
-
-- AI 自动修改规则
-- 根据老师反馈自动训练
-- Multi-Agent 自主讨论
-- 实时多人编辑
-- 自动换模型
-- 自动生成教材图片
-- 复杂成本优化
-- 全部门复杂权限体系
-- AI 自主决定生产流程
-- AI 自动修改其他三书
-
-这些都会增加复杂度，却不会决定 MVP 是否成功。
-
----
-
-# 三十五、推荐技术栈
-
-原方案中的技术选型整体可以保留。
-
-推荐：
-
-### Frontend
-
-```text
-Next.js
-TypeScript
-Tailwind
-shadcn/ui
-Tiptap / ProseMirror
-```
-
-### Backend
-
-MVP 可以继续：
-
-```text
-Next.js Server
-```
-
-如果未来任务系统越来越复杂：
-
-再独立：
-
-```text
-Python FastAPI
-```
-
-不建议现在就拆。
-
-### Database
-
-```text
-PostgreSQL
-Supabase
-```
-
-### Storage
-
-```text
-Supabase Storage / S3 compatible
-```
-
-存：
-
-- PDF
-- 图片
-- DOCX
-
-### AI
-
-统一做：
-
-```text
-AI Gateway
-```
-
-业务代码不要直接绑某一家模型。
-
-### Queue
-
-生成和审校都属于异步任务。
-
-早期可以：
-
-```text
-Supabase + background worker
-```
-
-规模扩大以后：
-
-```text
-Redis
-+
-BullMQ / Celery
-```
-
-### Deployment
-
-早期：
-
-```text
-Vercel
-+
-Supabase
-+
-Worker
-```
-
-足够。
-
----
-
-# 三十六、开发顺序
-
-推荐严格按这个顺序推进。
-
-## Phase 0：规则工程
-
-先不要急着大量 Coding。
-
-完成：
-
-```text
-新版教材结构表
-模块列表
-旧 → 新 Mapping
-规则层级
-Hard Rules
-Module Rules
-审校规则
-```
-
-如果这一阶段没做清楚：
-
-AI 后面效果不好，不一定是模型问题。
-
----
-
-## Phase 1：旧教材加工
-
-完成：
-
-```text
-PDF Upload
-OCR
-Vision
-Lesson 切分
-Module 切分
-图片提取
-人工确认
-```
-
-先处理：
-
-**1 个年级 + 2～3 个 Lesson**
-
-不要一次处理所有教材。
-
----
-
-## Phase 2：单模块迁移
-
-只做：
-
-```text
-Student Book
-Let's explore!
-```
-
-验证：
-
-```text
-旧教材
-+
-Mapping
-+
-Rules
-↓
-新版 Draft
-```
-
-这一阶段是整个项目的第一个生死节点。
-
----
-
-## Phase 3：Editor + Version
-
-加入：
-
-```text
-Word-like Editor
-Version History
-Confirm
-Edit Lock
-Audit Log
-```
-
----
-
-## Phase 4：Lesson Context
-
-实现：
-
-```text
-Student Book Confirmed
-↓
-AI Extract
-↓
-Teacher Confirm
-↓
-Lesson Context
-```
-
----
-
-## Phase 5：四书
-
-扩展到全部四书。
-
-完成：
-
-```text
-Cross-book suggestions
-```
-
----
-
-## Phase 6：Review
-
-接入现有审校 Skill。
-
-首先把 Skill 改造成：
-
-**Structured Findings**
-
-然后完成：
-
-```text
-Rule Checks
-+
-LLM Review
-+
-Cross-book Review
-```
-
----
-
-## Phase 7：DOCX + Pilot
-
-导出 DOCX。
-
-选取：
-
-**10～20 个真实 Lesson**
-
-让老师实际使用。
-
-记录：
-
-- 时间
-- AI 修改量
-- 建议接受率
-- 审校准确率
-- 老师反馈
-
-然后才决定后续是否部门级推广。
-
----
-
-# 三十七、项目最主要的五个风险
-
-## Risk 1：PDF 解析
-
-最大的工程风险可能不是 LLM。
-
-而是：
-
-**扫描教材解析质量。**
-
-如果教材在进入系统前就被错误切分，后续 AI 再强也没有意义。
-
-所以必须设计人工校验环节。
-
----
-
-## Risk 2：规则不完整
-
-规则工程还没有开始。
-
-这是目前最大的业务风险。
-
-不要用 Prompt 临时补规则。
-
-必须把隐性教研经验显性化。
-
----
-
-## Risk 3：AI 过度改写
-
-因为项目是迁移，而不是重新创作。
-
-必须通过：
-
-```text
+~~~text
 Preserve → Adapt → Generate
-```
+~~~
 
-和 Migration Plan 机制控制。
+1. 可直接沿用的内容优先迁移；
+2. 结构或标准不符时才改编；
+3. 确实缺失时才生成；
+4. 老师确认始终高于 AI 推断。
 
----
+## 2. 已确认的产品转向
 
-## Risk 4：四书内容漂移
+### 2.1 从 Web 协作平台转为个人本地工具
 
-解决：
+每位老师在自己的电脑上独立安装和使用工具。教材、规则、OCR 结果、参考资料、版本和导出稿只属于该电脑上的本地工作区。
 
-```text
-Student Book
-+
-Lesson Context
-+
-Confirmed State
-+
-Cross-book Suggestions
-```
+本版本不提供：
 
----
+- 用户账号、登录、角色、组织、共享项目；
+- 多人实时协作、模块编辑锁、抢占提示；
+- Audit Log、跨用户修改记录；
+- Supabase、PostgreSQL、S3、Vercel 或任何远程业务数据库；
+- 对外 REST API、远程教材内容接口或服务端任务队列。
 
-## Risk 5：规则更新污染历史
+“不同老师的数据不相互污染”的实现方式不再是数据库隔离，而是：
 
-解决：
+~~~text
+一人一台设备
+一人一个本地工作区
+一个项目一套独立文件目录与清单
+~~~
 
-```text
-Rule Version
-+
-Rule Snapshot
-+
-Module Version
-+
-Audit Log
-```
+### 2.2 一键运行而不是配置开发环境
 
----
+老师只需要安装和打开应用，不需要安装或配置 Node.js、Python、数据库、OCR 命令、环境变量、模型目录或端口。
 
-# 三十八、项目真正的“Agent”应该在哪里
+首个正式交付目标为 Windows x64 本地安装包。安装包应包含应用运行时、OCR Worker 和默认 OCR 模型；首次启动自动创建工作区并进行自检。GPU 加速可以作为应用内可选项，CPU 模式必须可用。
 
-如果以后仍希望加入 Agent，可以放在 Workflow 内部。
+应用可以通过桌面图标打开；如需浏览器访问，只允许由本机应用启动并绑定到 loopback 地址。不得把教材文件或本地接口暴露给局域网或公网。
 
-例如：
+### 2.3 保留公司 AI Gateway，但不把资料库上云
 
-### Migration Agent
+本地资料始终保存在工作区。调用公司 AI Gateway 生成或审校时，只发送当前任务必需的、已被老师确认可用于该任务的上下文；应用不建立远程教材数据库。
 
-负责：
+教师不编辑 .env 文件。正式安装包的网关地址、模型名和凭据由发布包或系统凭据库管理；密钥不写入教材工作区。
 
-```text
-Analyze
-↓
-COPY / ADAPT / GENERATE
-```
+## 3. 本地工作区：唯一事实源
 
-### Review Agent
+应用首次启动时自动建立固定工作区。默认路径暂定为：
 
-负责：
+~~~text
+%USERPROFILE%\Documents\AI教材工作台
+~~~
 
-```text
-Rule Interpretation
-↓
-Evidence
-↓
-Finding
-```
+工作区的内容全部可由老师在文件管理器中备份、复制和迁移；应用负责创建目录、命名、索引与校验，不要求老师手工整理。
 
-### Knowledge Agent
+建议目录契约如下：
 
-负责：
+~~~text
+AI教材工作台/
+  workspace.json                    # 工作区版本、应用配置与本地索引
+  projects/
+    <project-id>/
+      project.json                  # 年级、学期、Lesson 目录、项目设置
+      sources/
+        originals/                  # 原始 PDF / 图片，只复制不改写
+        ocr/
+          <ocr-job-id>/
+            manifest.json           # 引擎、版本、参数、状态、页数、确认信息
+            content.md              # 结构化 Markdown（带页码标记与课号）
+            structure.json          # 块：类型、页码、坐标（归一化）、阅读顺序、文本、置信度
+            pages/                  # 整页页图（JPEG 150DPI，可重建）
+            assets/                 # 区域裁切资产（表格/插图）
+            diagnostics.json        # 失败原因、低置信块、上游日志尾部
+      rules/
+        <rule-set-id>/
+          rule.md
+          versions/
+      references/
+        cambridge/
+        other/
+      lessons/
+        lesson-<NN>/                  # 与实现一致：lesson-01、lesson-02…
+          lesson.json
+          sources.json
+          context.json
+          books/
+            student/
+              <module-key>/
+                versions/
+                suggestions/
+            workbook/
+            knowledge/
+            vocab/
+          review/
+            <review-job-id>/
+              manifest.json        # 输入版本、规则快照、来源和任务状态
+              findings.json        # 审校结构化事实源
+              decisions.json       # 老师对 Finding 的处理决定
+              report.html          # 由结构化结果生成、可重建的静态报告
+      exports/
+      .app/
+        index.json                  # 可重建的本地索引，不能成为唯一事实源
+        jobs/
+        retrieval/                  # 可重建的检索索引与页图定位缓存
+        logs/
+~~~
 
-```text
-Cambridge Retrieval
-↓
-Evidence Ranking
-```
+正文、规则和说明优先保存为 Markdown / JSON；二进制原件和图片保留原始文件。任何用于加速检索的本地索引都必须可由上述源文件重建，不能形成隐藏数据库。
 
-但是不能让它们自己决定：
+## 4. 保留的教材业务模型
 
-```text
-下一步流程是什么
-```
+正式目标层级仍为：
 
-流程仍然由：
+~~~text
+Project → Grade → Term / Course → Lesson → 四书 → Module
+~~~
 
-**Workflow Orchestrator**
+- 目标侧统一使用 Lesson；旧版来源中的 Unit 仅在原文、OCR 和 provenance 中保留。
+- 四书：学生用书、练习册、知识清单、单词小超市。
+- 最小生成单位为完整 Module，不逐段生成。
+- 学生用书是主书；主书确认后生成 Lesson Context，其他三书参考主书、Lesson Context、旧版来源和生效规则。
+- Lesson Context 的当前字段为 Theme、Core Vocabulary、Grammar；后续可扩展阅读、技能、音标、交际功能、文化点和 Cambridge mapping。
+- 信息优先级：人工确认 > Lesson Context > 项目/课程规则 > 模块规则 > 旧版教材 > 剑桥资料 > 模型自身知识。
 
-决定。
+多书联动仍然采用 Suggest，不自动改写其他书。这里的“同步”发生在同一位老师的本地项目内部，不涉及协作同步。
 
----
+## 5. 本地 OCR 与教材加工
 
-# 三十九、最终产品核心竞争力
+OCR 现在是产品一级入口，与“教材制作”“审校”并列，而不是上传前的人工外部步骤。
 
-这个系统真正有价值的并不是：
+### 5.1 用户流程
 
-“用了 GPT”。
+~~~text
+选择本地 PDF / 图片
+        ↓
+创建 OCR 任务
+        ↓
+本地版面解析 + OCR + 图片/表格提取
+        ↓
+查看原页、结构化结果与识别置信提示
+        ↓
+老师快速修订、切分 Lesson / Module、确认
+        ↓
+写入本地 Production Source
+        ↓
+迁移生成 / 审校复用
+~~~
 
-而是逐渐积累出来的：
+未经确认的 OCR 结果只能是候选来源，不能进入正式生成。音标、词性、释义、表格单元格、图片关联和 OCR 易错字段必须允许老师逐项修订。
 
-```text
-旧教材结构化库
-+
-新版教材规则库
-+
-新旧结构 Mapping
-+
-Lesson Context
-+
-专业审校 Rule Set
-+
-历史教师修改
-+
-教材生产数据
-```
+### 5.2 默认引擎与替换边界
 
-这些才是真正属于公司的数字资产。
+**默认引擎定为 MinerU**（本地 sidecar Worker 形式随安装包提供），PaddleOCR PP-StructureV3 作为同批评测的对照候选。使用上游发行包与模型，不复制或自行训练 OCR 核心算法。
 
-模型未来即使从 GPT 换成其他模型：
+选 MinerU 的理由（2026-09-22 复核）：
 
-整个系统仍然成立。
+- **已在真实教材上验证**：寒假学生用书 131 页、知识清单 52 页已完整跑通，版面结构与栏目边界可用；
+- **输出已匹配本节的稳定契约**：同时产出 Markdown、`content_list.json`（块坐标、块类型、页码）、版面与阅读顺序数据、页图与图片资产；
+- 现有旧版来源解析（`lib/knowledge/legacy-student-book.ts`）正是按其输出特征校准的，换引擎需重建全部质量证据；
+- 支持中英文 OCR、版面检测、阅读顺序、表格识别、公式识别与 Markdown 结果。
 
----
+**许可证事实（2026-09-22 依本地安装的 3.4.5 版核对）**：MinerU 采用 `LicenseRef-MinerU-Open-Source-License`，即 Apache-2.0 加附加条款。附加条款的实际约束是：
 
-# 四十、项目一句话架构
+- **商用与分发允许**，无需单独商业许可；仅在「月活超过 1 亿」或「月收入超过 2000 万美元」时才需另行取得商业许可——本项目远未触及；
+- 标识义务只针对「**基于 MinerU 向第三方提供在线服务**」的情形；本产品是本地单机工具，不构成在线服务（仍建议在关于页与文档中标注所用引擎，成本极低）；
+- 因此**许可证本身不构成分发障碍**；随包分发仍需走公司内部确认（Q-CORE-012），并逐项归档所带**模型**的许可——这条对任何引擎都成立。
 
-整个系统最终可以概括为：
+引擎适配层必须与业务层隔离。其稳定输出契约为：
 
-```text
-          ┌─ Cambridge Knowledge
-          │
-Old Books ┼─ Rule System
-          │
-          └─ Lesson Context
-                  ↓
-        Workflow Orchestrator
-                  ↓
-       AI Migration Pipeline
-                  ↓
-          Teacher Editing
-                  ↓
-             Confirmed
-                  ↓
-          Four-book Package
-                  ↓
-          Review Pipeline
-                  ↓
-      Structured Review Findings
-                  ↓
-           Human Approval
-                  ↓
-                DOCX
-```
+~~~text
+原文件 + 页图 + 块坐标 + 块类型 + 文字/表格内容 + 图片资产 + 引擎元数据
+~~~
 
----
+不把任何引擎的专有输出格式直接写进 Lesson、规则或生成逻辑；换引擎不得影响业务层。
 
-# 四十一、最终原则
+Docling 是备选解析器，用于多格式文档、统一 JSON/Markdown 表示和质量对比；其代码为 MIT，但最终打包前仍须逐项核验所带模型许可。
 
-整个项目开发过程中始终坚持六条原则：
+PaddleOCR PP-StructureV3 是默认引擎的对照候选：代码为 Apache-2.0，所带模型许可同样须逐项归档。在同一批真实样张完成评测对比之前，不得宣称任何引擎「已满足教材生产精度」。
 
-### 1.
-**确定性优先于智能。**
+OCRmyPDF、Tesseract 等只可作为“给扫描 PDF 增加文字层”的辅助工具，不是教材结构化加工的主引擎。
 
-能够通过 Mapping 确定的事情，不让 AI 猜。
+### 5.3 OCR 界面
 
-### 2.
-**结构化优先于 Prompt。**
+新增一级导航“资料识别”：
 
-能够进入数据库的数据，不只写在 Prompt 中。
+~~~text
+资料识别 | 教材制作 | 审校 | 本地资料库 | 设置
+~~~
 
-### 3.
-**规则优先于模型知识。**
+“资料识别”界面应包含：
 
-业务标准永远由规则和知识库决定。
+- 本地文件拖入 / 选择；
+- OCR 任务列表和本机进度；
+- 原始页与结构化结果并排预览；
+- 块级文字、表格、图片、页码与来源定位；
+- Lesson / Module 切分与确认；
+- “保存为已确认来源”动作；
+- 失败原因、可重试操作和本地诊断包。
 
-### 4.
-**人工确认优先于 AI。**
+不显示云端上传、成员、评论、共享链接或协作状态。
 
-老师修改永远拥有最高优先级。
+## 6. 规则、来源与版本
 
-### 5.
-**建议优先于自动修改。**
+### 6.1 规则
 
-涉及教材内容联动时，默认 Suggest，而不是 Auto Apply。
+规则继续是“人类可读说明 + 机器可读约束”，并保存版本快照。规则文件保存于本地项目或工作区；导入、编辑、发布和废弃都只改变当前本地副本。
 
-### 6.
-**Workflow 控制 AI，而不是 AI 控制 Workflow。**
+作用域继续支持 Global / Project / Grade / Book / Module / Lesson Override。Hard Rule 不可被低层规则覆盖。
 
-这是整个系统保持稳定、可审计和可扩展的根本。
+当前确定性检查与 LLM 判断继续分层：
+
+- 确定性：字数、章节、来源确认、来源标注、禁用词、题量等可计算项目；
+- LLM：难度、自然度、教学目的、题目质量和跨书语义一致性。
+
+### 6.2 来源与映射
+
+旧教材加工后，以结构化来源而非“PDF 全文向量检索”参与生产。新旧 Module Mapping 必须支持一对一、一对多和多对一，并与来源定位一起保存到本地文件。
+
+知识资料仍区分：
+
+1. Production Source：已确认旧版公司教材；
+2. Authoritative Standards：Cambridge 官方大纲、CEFR、官方词表；
+3. Reference Materials：真题、教辅和其他参考。
+
+Structured Retrieval 优先；Embedding 只能作为可替换的本地能力，不能替代 Lesson、书种、Module 与来源确认边界。
+
+### 6.3 版本
+
+AI 重新生成、老师保存、接受建议都必须产生新 Module Version，绝不覆盖旧稿。版本和其 rule snapshot、source refs、retrieval trace、Migration Plan、生成模型信息保存于对应 Lesson 文件夹。
+
+原先的 Module Edit Lock 与多人 Audit Log 不再是需求。个人版本历史、恢复、对比和本地修改时间仍是需求。
+
+## 7. 生成、修改建议、审校与通用检索
+
+### 7.1 教材生成
+
+生成管线的业务顺序保留：
+
+~~~text
+Identify
+→ Mapping Resolver
+→ Source Retriever
+→ Context Builder
+→ Rule Resolver
+→ Cambridge Retriever
+→ Migration Planner
+→ Generator
+→ Validator
+→ Save Version
+→ AI Suggestions
+~~~
+
+OCR 确认是 Source Retriever 之前的前置能力。
+
+### 7.2 AI 教材修改建议
+
+教材制作界面现有的“修改建议”区域保留，但其能力从固定按钮扩展为**当前 Module 范围内的自然语言修改建议助手**。老师在 Module 已完成迁移并保存草稿后，可以输入如“把这篇阅读调整为 PET 难度，同时保留核心词汇”等要求。
+
+助手每次只接收本任务必要的 Context Pack：
+
+1. 当前 Module 的明确版本；
+2. 当前 Lesson Context 与相关书种上下文；
+3. 按作用域解析并压缩后的有效规则；
+4. 本地 Cambridge 资料中经检索命中的相关片段；
+5. 老师本次自然语言要求。
+
+规则压缩必须保留规则 ID、Hard/Soft 属性、作用域、约束值和冲突关系，不得只让模型自由摘要。Cambridge 内容必须通过本地检索按需加入，并带文件、页码和区域定位；不得把整本参考书无差别塞入上下文。
+
+该能力可以在内部采用有步骤的任务规划，但对产品而言是受控的 Suggestion Assistant，不是能自行改稿、发布或无限调用工具的自治智能体。输出必须是结构化建议，至少包括：修改类型、原文定位、建议文本、理由、规则依据、参考资料证据和不确定性。正文与建议分开保存；只有老师点击“采用建议”并保存后才生成新的 Module Version。
+
+### 7.3 独立审校工作台
+
+“教材审校”是与“资料识别”“教材制作”并列的一级功能，在全局左侧导航中拥有独立入口和独立页面，不附属于导出按钮或制作页侧栏。
+
+审校仍是一条 Pipeline，而不是一个长 Prompt：
+
+~~~text
+Preprocessor
+→ Rule Checks
+→ Cross-book Checks
+→ Cambridge Checks
+→ Language Checks
+→ LLM Review
+→ Finding Aggregator
+→ Teacher Review
+~~~
+
+用户后续提供的审校 Skill 是审校方法、规则和报告逻辑的迁移来源，不直接原样运行。接入时必须：
+
+1. 区分可复用的审校方法与已过时的教材内容；
+2. 将规则转换为本项目“人类可读说明 + 机器可读约束”的本地规则格式和一致的中文表达；
+3. 保留原 Skill 规则到新规则 ID 的来源映射；
+4. 用新版大纲、书种、Module 和 Lesson Context 重新确定作用域；
+5. 以真实样本、反例和已知问题验证精度后才启用。
+
+**已接入（2026-10-09）**：公司审校标准 `pet-material-review` v1.0.0 的 24 条规则进入随包基线
+`resources/rules/`（`rule_key` 原样沿用标准 id），判据材料进入 `resources/knowledge/review-standards/`，
+按规则的 `standard_refs` 定向取用。审校规则与生成规则按 `rule_type` 分流。规则集身份
+（`rulesetId` / `rulesetVersion` / 审校日期）记入每次审校的 manifest，历史结果按当时那一版标准解释。
+标准的「通过 / 需要修改 / 材料未提供无法核查」三态中，后两态落到 Finding；`human_visual` 类规则
+因工作台审的是文字稿，按标准自己的 `cannot_verify` 语义如实标注为需人工目视核对。
+详见 `docs/REVIEW-SKILL-INTEGRATION.md`；遗留确认项见 question.md Q-CORE-027~029。
+
+审校 Finding 保持独立、结构化、可定位；允许 `INSUFFICIENT_EVIDENCE`。**不带严重度**（审校标准明确不新增严重度字段）：结论按教材顺序排列，老师按书种、Module、处理状态和规则筛选，查看正文位置与 PDF 原页证据，并对每条 Finding 采用、忽略或标记复查。
+
+审校结束后，页面提供“生成审校报告”和“查看报告”按钮。报告由 `findings.json`、老师决定和审校 manifest 通过固定模板生成并在软件内显示，不能让模型直接自由输出整份 HTML。`report.html` 是可重建展示物，结构化 Findings 才是事实源。报告至少包含审校范围、输入版本、规则快照、来源说明、问题汇总、逐条证据、修改建议、不确定项和人工处理状态。
+
+所有模型文本写入 HTML 前必须转义或经过白名单净化；报告不执行脚本、不加载远程资源，避免教材内容或模型输出形成可执行页面。
+
+审校记录只保存在本地 `Lesson/review` 目录。
+
+### 7.4 首页通用助手
+
+主页集成“通用助手”，用于对老师本地已导入并建立索引的旧教材、Cambridge 资料、规则和当前项目内容进行只读检索。老师可以用自然语言提问，例如“检索 Let's say 模块中的某核心词汇”。
+
+回答必须优先返回可核验的检索结果，而不是仅给模型总结：
+
+- 命中的书名、Lesson、Module、文件和页码；
+- 命中文本及必要上下文；
+- 原书 PDF 页图或命中区域截图；
+- 来源状态以及是否经过老师确认。
+
+原书截图来自 OCR 阶段保存的页图和块坐标；没有精确区域时退化为整页预览并说明。通用助手默认只读，不直接修改教材、规则或审校结果。后续提供的本地检索工具代码必须通过 adapter 接入稳定的查询与证据契约，不把其内部索引格式扩散到业务层。
+
+异步是“本机后台任务”的要求：OCR、生成、修改建议与审校不得冻结界面，任务状态和可恢复输出写入 .app/jobs；不建设远程队列、worker 服务或数据库任务表。
+
+## 8. 目标技术架构
+
+正式形态：
+
+~~~text
+桌面启动器（Windows）
+        ↓ 本地命令桥
+本地前端界面
+        ↓
+本地文件工作区
+        ↓
+OCR Sidecar（默认 MinerU，见 §5.2）
+        ↓
+可选公司 AI Gateway
+~~~
+
+建议采用 Tauri v2 或同等桌面壳，前端静态打包并经本地命令桥访问文件和 sidecar。业务逻辑通过本地命令调用，不再保留 Next.js REST API 作为产品边界。
+
+当前 Next.js + Supabase 原型不是后续运行时架构；它仍可作为 UI、文档编辑、规则解析、检索和 DOCX 逻辑的迁移来源。
+
+本地文件访问必须限制在工作区、用户主动选择的导入文件和用户主动选择的导出位置。路径校验、文件类型/大小限制、sidecar 输出隔离和安全删除策略属于正式实现范围。
+
+## 9. 修订后的开发顺序
+
+### Local-0：本地产品基座
+
+- 冻结当前 Web 原型为迁移参考；
+- 确定 Windows 安装包、桌面壳、工作区路径与本地凭据方案；
+- 用文件清单替代 Supabase 数据模型；
+- 移除协作、远程数据库和对外 API 依赖。
+
+### Local-1：资料识别
+
+- 封装默认 OCR Worker（MinerU，见 §5.2）与对照候选 PaddleOCR；
+- 完成 PDF/图片导入、任务、页预览、结构化输出、图片资产与老师确认；
+- 以真实教材样张完成质量基准测试。
+
+### Local-2：迁移闭环
+
+- 把当前大纲、规则、映射、结构化检索、Migration Plan、编辑与版本逻辑迁至本地工作区；
+- 先验证一个年级、2–3 个 Lesson 的学生用书单模块迁移。
+
+### Local-3：四书与独立审校工作台
+
+- Lesson Context；
+- 其余三书和跨书建议；
+- 接入用户提供的审校 Skill，将其方法和规则迁移为项目规则格式；
+- 独立审校页面、本地审校 Pipeline、Findings、人工复核、HTML 报告和 DOCX 导出。
+
+**进度（2026-10-08）**：独立审校工作台**机器已落地**——`/review` 页面、八段 Pipeline、
+`manifest/findings/decisions/report.html` 契约、人工决定与固定模板报告。
+规则内容仍是草稿态（工作区里 4 条 `review` 类型规则，约束为空），等教研确认后直接变强，
+不改代码（见 question.md Q-CORE-014/018）。四书里**单词小超市与绘本没有素材**（旧版 PDF
+与新版样张都没有），暂无法开工；整课范围的审校留到第二批。
+
+### Local-4：Module 修改建议助手
+
+- 在制作页接入自然语言修改要求；
+- 构建带规则 ID 与来源定位的最小 Context Pack；
+- 输出、展示、逐条采用并版本化结构化建议。
+
+### Local-5：通用助手
+
+- 通过 adapter 接入后续提供的本地检索工具；
+- 支持跨本地资料的自然语言检索、来源定位与原书 PDF 截图查看；
+- 保持只读，不与制作、审校的写入命令混用。
+
+每完成一个产品模块，必须先做该模块的孤立复核，再做全产品集成复核；复核范围和证据按 workflow.md 执行。未完成两类复核，不进入下一个产品模块的正式开发。
+
+## 10. 本阶段不做
+
+- 多人协作、账号、权限、共享、云端教材库；
+- 远程数据库、外部业务 API、服务端任务队列；
+- AI 自动改写其他书种；
+- AI 自动修改规则、自动训练；
+- 自治智能体直接修改、确认或发布教材；
+- 通用助手通过问答结果直接写入教材；
+- AI 生成或重绘教材图片；
+- 未经许可审核的第三方 OCR 引擎、模型或云 OCR 服务。
+
+## 11. 成功标准
+
+老师在一台新电脑上完成安装后，不打开终端、不编辑配置文件，即可：
+
+1. 打开本地工具；
+2. 导入一份扫描教材 PDF；
+3. 得到可预览、可修订、可按 Lesson/Module 切分的本地 OCR 结果；
+4. 确认来源并按规则生成一个模块 Draft；
+5. 用自然语言获得带规则与来源证据的 Module 修改建议，并逐条决定是否采用；
+6. 在独立审校页面完成审校、人工复核，并在软件内生成和查看 HTML 审校报告；
+7. 在主页用自然语言定位一个知识点并查看对应 PDF 原页证据；
+8. 编辑、保存版本并导出 DOCX；
+9. 复制整个工作区后，在另一台已安装工具的电脑上继续打开项目。
+
+## 12. 最终原则
+
+1. 本地资料优先于云端便利；
+2. 单人流程优先于协作复杂度；
+3. 结构化 OCR 优先于纯文本 OCR；
+4. 确定性优先于智能；
+5. 规则优先于模型知识；
+6. 人工确认优先于 AI；
+7. 建议优先于自动修改；
+8. Workflow 控制 AI。

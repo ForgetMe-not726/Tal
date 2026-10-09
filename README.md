@@ -1,38 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI 教材智能迁移与审校工具
 
-> 状态说明：当前代码由既有纯前端原型迁入，作为视觉和组件基础。代码仍包含 `Unit`、同步 Mock 生成、只读正文与模拟 DOCX 导出等已知差异；权威产品与技术方案见根目录 `profile.md`。
+> 文档同步基线：profile.md V1.2，2026-09-22。
 
-## Getting Started
+这是一个面向教研老师个人使用的本地教材迁移、优化与审校工具。它将旧版教材、规则、剑桥参考资料与 OCR 结果保存在老师本地工作区，帮助老师完成“资料识别 → 教材制作 → 教材审校”的闭环，并提供受控的 Module 修改建议和可查看原书 PDF 证据的通用助手。
 
-First, run the development server:
+当前仓库仍是 Next.js / Supabase 原型，主要保留 UI、规则、检索、版本与 DOCX 的迁移资产；正式产品方向已调整为 Windows 本地安装包、文件工作区与本地 OCR Worker。
 
-```bash
+先阅读：
+
+- [项目文档索引](docs/README.md)
+- [总体方案](profile.md)
+- [产品说明](PRODUCT.md)
+- [OCR 选型](docs/OCR-ENGINE-DECISION.md)
+- [审校 Skill 整合与 HTML 报告](docs/REVIEW-SKILL-INTEGRATION.md)
+- [AI 修改建议与本地检索助手](docs/AI-ASSISTANT-RETRIEVAL.md)
+- [待确认问题](question.md)
+- [本地版移交说明](docs/HANDOVER.md)
+
+## 原型开发说明
+
+安装依赖后，可运行：
+
+~~~text
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+npm test
+npm run build
+~~~
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+这仅用于现有原型维护和后续本地化迁移验证，不是老师端的正式安装方式。

@@ -1,0 +1,66 @@
+A1=单词小超市审校list
+A2=核查大类 | B2=细分核查项 | C2=详细校对要求 | D2=备注【可以放图示例】 | E2=是否完成
+A3=二维码 | B3=名字正确 | C3=26秋下-单词小超市-第X课 | E3=0
+A4=页眉页脚 | B4=基础信息核对 | C4=页眉：
+Lesson 【9-15】 ，注意 Lesson 大写
+
+页脚：
+序号顺次且不能被图片遮盖
+ | E4=0
+A5=封面及目录 | B5=基础信息核对 | C5=封面:
+季节【Autumn 9-15】
+名称【Vocab Builder】【木棍体/手写体】
+层级【LEVEL 5】信息无误；
+
+目录:
+标题按大纲核对完整【拼写 大小写 标点】；
+页码校对无遗漏、顺序正确；
+与学生用书及练习册保持一致 | E5=0
+A6=标题及题干 | B6=题目标题原则 | C6=内容：
+所有标题均为首字母大写，拼写无误、大小写格式统一
+所有题干末尾统一无小图标，序号规范统一
+标题顺序与题目做题顺序对应一致，内容匹配无误
+ | E6=0
+A7=图片 | B7=图片要求 | C7=教学目标一致性:
+表达教学点;
+不要遮挡教学点
+图片准确度:
+无融色或颜色太扎眼等问题;
+无穿帮;
+安全合规【安全带 泳圈】 | E7=0
+A8=题目 | B8=一般题目
+ | C8=题干:
+符合题目要求；题干序号正确;
+示例标准：
+本书第一次出现的题型要加示例，后续同题型不再加示例
+示例文字为天蓝色
+示例答案全部划掉
+排版要求：
+版式美观，做题易懂，横线一致，空格数量正确
+内容：
+单词写完整、词汇无遗漏；
+单词拼写，大小写，统一英式拼写；
+答案唯一；
+单词句子词汇、语法均不超纲；难度符合该年纪水平；内容符合常识与正向价值观
+单项选择题选项不超纲且至少有两个选项是本课核心单词
+格式：
+1 Write the correct words/phrases according to meanings. (匹配词义释义)
+2 Choose the correct words/phrases to complete the sentences. (两组选词填空)
+3 Choose the correct answer to each sentence. (单项选择) | E8=0
+B9=特殊进阶题目-加星号 | C9=题干:
+符合题目要求；题干序号正确;
+内容：
+释义拼写、语法正确，无超纲词汇；
+答案唯一；
+无迷惑项，题目数量与配图数量一一对应
+特殊规则——根据提示完成单词的变形（均来源本课词汇拓展）
+与题目要求一致
+文字排版、格式统一标准
+内容贴合题目，拼写、语法全部正确
+格式：
+4 Complete the sentence with the provided words or tips. (给出提示词变形填空，5道题)。 | E9=0
+A10=Review 复习板块 | B10=模块单词整理 | C10=模块单词无遗漏，词汇分组正确-前四讲
+1. Please match the following English definition with corresponding word or phrase and write it on the line.两组
+2. For each question, choose the correct answer. 大约14题
+3. Write the correct words according to the meanings.  大约14题
+4 Complete the sentence with the provided words or tips. (给出提示词变形填空，5道题)。 | E10=0
