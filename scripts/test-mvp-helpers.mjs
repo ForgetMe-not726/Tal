@@ -8,18 +8,16 @@ const baseSuggestion = {
   originalText: "apple",
   replacementText: "pear",
   reason: "test",
-  severity: "info",
   confidence: 0.9,
 };
 
 function testParseObject() {
   const result = parseSuggestions(
-    '{"suggestions":[{"kind":"replace","original_text":"a","replacement_text":"b","reason":"r","severity":"warning","confidence":0.9}]}',
+    '{"suggestions":[{"kind":"replace","original_text":"a","replacement_text":"b","reason":"r","confidence":0.9}]}',
   );
   assert.equal(result.length, 1);
   assert.equal(result[0].kind, "replace");
   assert.equal(result[0].originalText, "a");
-  assert.equal(result[0].severity, "warning");
   assert.equal(result[0].confidence, 0.9);
 }
 

@@ -86,15 +86,37 @@ export interface GeneratedBlock {
   letter: string;
 }
 
+/** 建议依据的本地来源（带定位，供「查看原页」）。 */
+export interface SuggestionEvidence {
+  label: string;
+  sourceRef: string;
+  page?: number | null;
+  /** 能定位到已确认的 OCR 来源时带上；没有就只能显示文字定位。 */
+  ocrJobId?: string | null;
+}
+
 export interface ContentSuggestion {
   id: string;
   kind: "replace" | "insert" | "delete" | "note";
   originalText: string;
   replacementText: string;
   reason: string;
-  severity: "info" | "warning" | "error";
   confidence: number | null;
+  /**
+   * 依据的规则 ID。**已对着本次 Context Pack 校验过**——模型报了不存在的规则会被丢掉，
+   * 不让它拿一个编出来的 ID 充当依据（与审校侧同一条纪律）。
+   */
+  ruleKeys?: string[];
+  /** 依据的本地来源，同样已校验。 */
+  evidence?: SuggestionEvidence[];
+  /** 模型自己说明的不确定性与资料缺口。 */
+  uncertainty?: string;
 }
+
+/** 建议在界面上的处理状态（`docs/AI-ASSISTANT-RETRIEVAL.md` §3 要求每条带状态）。 */
+export type SuggestionStatus = "pending" | "adopted" | "ignored";
+
+export type WorkbenchSuggestion = ContentSuggestion & { status: SuggestionStatus };
 
 export interface RuleFile {
   id: string;

@@ -3,7 +3,11 @@
 import * as React from "react";
 import { WorkbenchLeftPanel } from "@/components/workbench/WorkbenchLeftPanel";
 import { WorkbenchCenter } from "@/components/workbench/WorkbenchCenter";
-import { WorkbenchSuggestionPanel } from "@/components/workbench/WorkbenchSuggestionPanel";
+import {
+  WorkbenchSuggestionPanel,
+  type SuggestionGap,
+  type SuggestionRuleRef,
+} from "@/components/workbench/WorkbenchSuggestionPanel";
 import {
   filterLegacyCandidatesForLesson,
   lessonSourceStats,
@@ -14,7 +18,7 @@ import { missingSourceMessage, selectSourceText } from "@/lib/knowledge/source-s
 import { BOOK_TYPES, plateLetter, plateTone } from "@/lib/mock";
 import { moduleOrdinal } from "@/lib/markdown/heading-levels";
 import { applySuggestionToMarkdown, type ApplyFailureReason } from "@/lib/suggestions/apply";
-import type { AiDiagnosticsView, BlockCheck, ContentSuggestion, BookTypeId, ExportFormat, GeneratedBlock, LegacyLessonPackage, LegacySectionKey, LessonType, Level, ModuleDef, ModuleVersionSummary, OutlineLessonProfile, OutlineProfile } from "@/lib/types";
+import type { AiDiagnosticsView, BlockCheck, ContentSuggestion, BookTypeId, ExportFormat, GeneratedBlock, LegacyLessonPackage, LegacySectionKey, LessonType, Level, ModuleDef, ModuleVersionSummary, OutlineLessonProfile, OutlineProfile, WorkbenchSuggestion } from "@/lib/types";
 
 const TERM = "winter";
 /**
@@ -39,7 +43,17 @@ type GenerationResponse = {
 };
 
 type SaveResponse = { version: { id: string }; checks?: BlockCheck[] };
-type SuggestionState = { blockId: string; versionId?: string; items: ContentSuggestion[] };
+type SuggestionState = {
+  blockId: string;
+  versionId?: string;
+  items: WorkbenchSuggestion[];
+  /** 本次进 Context Pack 的规则（把规则 ID 显示成规则名）。 */
+  rules: SuggestionRuleRef[];
+  /** 本次资料缺口与规则冲突：老师要能看见"这次依据全不全"。 */
+  gaps: SuggestionGap[];
+  conflicts: Array<{ key: string; summary: string }>;
+  jobId: string;
+};
 
 function makeFileName(level: Level, bookTypeId: BookTypeId, lessonNumber: number, lessonTitle: string) {
   const label = BOOK_TYPES.find((book) => book.id === bookTypeId)?.label ?? "教材";
@@ -123,12 +137,20 @@ export default function WorkbenchPage() {
   const legacyCandidates = filterLegacyCandidatesForLesson(legacyPackages, selectedSourceUnit);
   // 编号顺序来自模块目录（已按课型过滤、按 sortOrder 排好）。
   const numberedKeys = modules.filter((item) => item.numbered).map((item) => item.moduleKey ?? item.id);
-  const suggestions =
+  // 只有"当前模块 + 版本一致"时才显示建议；换了模块或正文变版就自动失效
+  const activeSuggestionState =
     activeBlock &&
-    suggestionState?.blockId === activeBlock.id &&
+    suggestionState &&
+    suggestionState.blockId === activeBlock.id &&
     suggestionState.versionId === activeBlock.versionId
-      ? suggestionState.items
-      : [];
+      ? suggestionState
+      : null;
+  const suggestions = activeSuggestionState?.items ?? [];
+  const visibleSuggestionMeta = {
+    rules: activeSuggestionState?.rules ?? [],
+    gaps: activeSuggestionState?.gaps ?? [],
+    conflicts: activeSuggestionState?.conflicts ?? [],
+  };
 
   React.useEffect(() => {
     let active = true;
@@ -693,18 +715,37 @@ export default function WorkbenchPage() {
           grade: level,
           bookType,
           moduleKey: activeBlock.moduleKey ?? activeBlock.id,
+          moduleLabel: activeBlock.moduleLabel,
           projectId: contextIds.projectId,
           lessonId: contextIds.lessonId,
+          lessonNumber,
+          lessonTitle,
+          // 版本号让服务端能取到本课目标与来源证据
+          versionId: target.versionId,
         }),
       });
-      const data = (await response.json()) as { suggestions?: ContentSuggestion[]; error?: string };
+      const data = (await response.json()) as {
+        jobId?: string;
+        suggestions?: ContentSuggestion[];
+        rules?: SuggestionRuleRef[];
+        gaps?: SuggestionGap[];
+        conflicts?: Array<{ key: string; summary: string }>;
+        error?: string;
+      };
       if (!response.ok) throw new Error(data.error ?? "建议生成失败");
       const current = blocksRef.current.find((block) => block.id === target.blockId);
       if (epoch !== requestEpoch.current || !current || current.versionId !== target.versionId || current.markdown !== target.markdown) {
         setToast("正文版本已变化，已丢弃过期建议");
         return;
       }
-      setSuggestionState({ ...target, items: data.suggestions ?? [] });
+      setSuggestionState({
+        ...target,
+        items: (data.suggestions ?? []).map((item) => ({ ...item, status: "pending" as const })),
+        rules: data.rules ?? [],
+        gaps: data.gaps ?? [],
+        conflicts: data.conflicts ?? [],
+        jobId: data.jobId ?? "",
+      });
       setToast(`已生成 ${data.suggestions?.length ?? 0} 条建议`);
     } catch (error) {
       if (epoch === requestEpoch.current) setToast((error as Error).message);
@@ -730,7 +771,12 @@ export default function WorkbenchPage() {
       return;
     }
     setBlocks((previous) => previous.map((block) => block.id === activeBlock.id ? { ...block, markdown: result.markdown } : block));
-    setSuggestionState((previous) => previous ? { ...previous, items: previous.items.filter((item) => item.id !== suggestion.id) } : previous);
+    // 采用后**保留**条目并标状态：老师要能回看自己处理了什么（原文→建议就在卡片上对照）
+    setSuggestionState((previous) =>
+      previous
+        ? { ...previous, items: previous.items.map((item) => item.id === suggestion.id ? { ...item, status: "adopted" as const } : item) }
+        : previous,
+    );
     setToast("建议已应用到编辑草稿，请保存为新版本");
   }
 
@@ -790,10 +836,19 @@ export default function WorkbenchPage() {
       <WorkbenchSuggestionPanel
         block={activeBlock}
         suggestions={suggestions}
+        rules={visibleSuggestionMeta.rules}
+        gaps={visibleSuggestionMeta.gaps}
+        conflicts={visibleSuggestionMeta.conflicts}
         busy={suggestionBusy || saving}
         onGenerate={(instruction) => void handleGenerateSuggestions(instruction)}
         onApply={handleApplySuggestion}
-        onDismiss={(id) => setSuggestionState((previous) => previous ? { ...previous, items: previous.items.filter((item) => item.id !== id) } : previous)}
+        onDismiss={(id) =>
+          setSuggestionState((previous) =>
+            previous
+              ? { ...previous, items: previous.items.map((item) => item.id === id ? { ...item, status: "ignored" as const } : item) }
+              : previous,
+          )
+        }
       />
 
       {toast && (

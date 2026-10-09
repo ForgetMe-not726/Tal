@@ -203,6 +203,21 @@ export function jobsDir(): string {
   return join(appDir(), JOBS_DIR);
 }
 
+/**
+ * 修改建议的 Context Pack 诊断记录。
+ *
+ * 放在 `.app/jobs/` 的**子目录**里，不直接平铺：`jobsDir()` 下平铺的 `*.json`
+ * 会被 OCR 与审校的 `listJobs()` 当成任务记录读走，形状对不上就会污染任务列表。
+ * 子目录名不以 `.json` 结尾，`readJsonDir` 天然跳过。
+ */
+export function suggestionJobsDir(): string {
+  return join(jobsDir(), "suggestions");
+}
+
+export function suggestionJobFile(jobId: string): string {
+  return join(suggestionJobsDir(), `${safeSegment(jobId)}.json`);
+}
+
 export function appDir(): string {
   return join(workspaceRoot(), APP_DIR);
 }

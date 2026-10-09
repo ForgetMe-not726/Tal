@@ -12,19 +12,11 @@
  */
 
 import { spawn } from "node:child_process";
+import { DEFAULT_PAGE_IMAGE, pageImageName, type PageImageOptions } from "./page-names.ts";
 
-export type PageImageOptions = {
-  format: "jpeg" | "png";
-  dpi: number;
-  quality: number;
-};
-
-/** 默认页图参数：实测学生用书 131 页落在约 30–50 MB。 */
-export const DEFAULT_PAGE_IMAGE: PageImageOptions = { format: "jpeg", dpi: 150, quality: 85 };
-
-export function pageImageName(index: number, format: PageImageOptions["format"] = "jpeg"): string {
-  return `p${String(index).padStart(4, "0")}.${format === "jpeg" ? "jpg" : "png"}`;
-}
+// 命名与参数在 `page-names.ts`（客户端也能引用）；这里转出去，原有的引用点不用改。
+export { DEFAULT_PAGE_IMAGE, pageImageName };
+export type { PageImageOptions };
 
 /** 渲染脚本（多行 Python，作为**单个 argv** 传给 `python -c`，不经过 shell）。 */
 const RENDER_SCRIPT = [
