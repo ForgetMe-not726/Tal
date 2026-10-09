@@ -1,6 +1,6 @@
 "use client";
 
-import { Separator } from "@/components/ui/separator";
+import { Check, FileText, Loader2 } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -8,104 +8,320 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PlateSwatch } from "@/components/print-marks";
+import { sourceUnitForTargetLesson } from "@/lib/knowledge/legacy-markdown";
+import { plateLetter, plateTone } from "@/lib/mock";
 import { BOOK_TYPES, LEVELS } from "@/lib/mock";
-import type { BookTypeId, Level } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import type { AiDiagnosticsView, BookTypeId, GeneratedBlock, LessonType, Level, ModuleDef, OutlineLessonProfile, OutlineProfile } from "@/lib/types";
+
+const LESSON_TYPES: Array<{ id: LessonType; label: string }> = [
+  { id: "regular", label: "常规课" },
+  { id: "revision", label: "复习课" },
+];
+
+/** 默认按课时编号一一对应；大纲标注了变更则显示覆盖后的讲次。 */
+function sourceUnitLabel(lesson: OutlineLessonProfile): string {
+  const annotated = lesson.mappings.filter((mapping) => mapping.legacySourceUnit);
+  const unit = sourceUnitForTargetLesson(lesson);
+  if (!unit) return "未确定";
+  return annotated.length > 0 ? `旧第 ${unit} 讲（大纲标注）` : `旧第 ${unit} 讲（默认一一对应）`;
+}
 
 interface Props {
   level: Level;
+  lessonNumber: number;
+  lessonTitle: string;
   bookType: BookTypeId;
-  plateCount: number;
-  totalPlates: number;
-  onLevelChange: (l: Level) => void;
-  onBookTypeChange: (b: BookTypeId) => void;
-}
-
-function Field({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-2">
-      <dt className="text-ink-3">{label}</dt>
-      <dd className="text-right text-ink">{value}</dd>
-    </div>
-  );
+  lessonType: LessonType;
+  aiDiagnostics: AiDiagnosticsView | null;
+  outlineProfile: OutlineProfile | null;
+  selectedOutlineLesson: OutlineLessonProfile | null;
+  selectedLessonKey: string | null;
+  outlineFileName: string | null;
+  outlineLoading: boolean;
+  modules: ModuleDef[];
+  blocks: GeneratedBlock[];
+  loadingModule: string | null;
+  /** 模块 id → 生成失败原因，就地显示，避免只有一闪而过的提示。 */
+  failures?: Record<string, string>;
+  /** 本地项目（此前项目名写死在页面常量里，两边对不上就选不到刚识别完的来源）。 */
+  projects: Array<{ id: string; name: string; grade: string; term: string }>;
+  projectId: string;
+  onProjectChange: (projectId: string) => void;
+  /** 已确认的 OCR 来源（资料识别页确认过的），可直接选用。 */
+  ocrSources: Array<{ jobId: string; originalName: string; pageCount: number }>;
+  onSelectOcrSource: (jobId: string) => void;
+  onOutlineFileChange: (file: File) => void;
+  onOutlineLessonChange: (lessonKey: string) => void;
+  onLegacyMarkdownFileChange: (file: File) => void;
+  onLevelChange: (value: Level) => void;
+  onLessonNumberChange: (value: number) => void;
+  onLessonTitleChange: (value: string) => void;
+  onBookTypeChange: (value: BookTypeId) => void;
+  onLessonTypeChange: (value: LessonType) => void;
+  onGenerateModule: (module: ModuleDef) => void;
 }
 
 export function WorkbenchLeftPanel({
   level,
+  lessonNumber,
+  lessonTitle,
   bookType,
-  plateCount,
-  totalPlates,
+  lessonType,
+  aiDiagnostics,
+  outlineProfile,
+  selectedOutlineLesson,
+  selectedLessonKey,
+  outlineFileName,
+  outlineLoading,
+  modules,
+  blocks,
+  loadingModule,
+  failures = {},
+  projects,
+  projectId,
+  onProjectChange,
+  ocrSources,
+  onSelectOcrSource,
+  onOutlineFileChange,
+  onOutlineLessonChange,
+  onLegacyMarkdownFileChange,
   onLevelChange,
+  onLessonNumberChange,
+  onLessonTitleChange,
   onBookTypeChange,
+  onLessonTypeChange,
+  onGenerateModule,
 }: Props) {
+  const generated = new Set(blocks.map((block) => block.moduleKey ?? block.id));
+  const doneCount = modules.filter((module) => generated.has(module.moduleKey ?? module.id)).length;
+  const busy = loadingModule !== null;
+  const canGenerate = selectedOutlineLesson !== null && modules.length > 0;
+
   return (
-    <aside className="flex w-[240px] shrink-0 flex-col border-r border-line bg-paper">
-      <div className="border-b border-line px-4 py-3">
-        <h2 className="text-sm font-semibold tracking-tight">教材参数配置</h2>
-        <p className="mt-0.5 font-mono text-[11px] text-ink-3">印前参数</p>
+    <aside className="flex h-full w-[280px] shrink-0 flex-col overflow-y-auto border-r border-line bg-paper">
+      <div className="border-b border-line px-4 py-2.5">
+        <h2 className="text-sm font-semibold tracking-tight">迁移参数</h2>
+        {aiDiagnostics && (
+          <p className="mt-0.5 truncate text-[10px] text-ink-3">
+            {aiDiagnostics.provider === "mock"
+              ? "AI：Mock 联调"
+              : aiDiagnostics.configured
+                ? "AI：已配置"
+                : "AI：未配置"}
+          </p>
+        )}
       </div>
 
-      <div className="flex flex-col gap-4 px-4 py-4">
-        <div className="space-y-1.5">
-          <label htmlFor="level" className="text-xs font-medium text-ink-2">
-            层级
-          </label>
-          <Select value={level} onValueChange={(v) => onLevelChange(v as Level)}>
-            <SelectTrigger id="level" className="w-full">
-              <SelectValue placeholder="选择层级" />
-            </SelectTrigger>
-            <SelectContent>
-              {LEVELS.map((l) => (
-                <SelectItem key={l} value={l}>
-                  {l}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-1.5">
-          <label htmlFor="bookType" className="text-xs font-medium text-ink-2">
-            书种
-          </label>
-          <Select
-            value={bookType}
-            onValueChange={(v) => onBookTypeChange(v as BookTypeId)}
+      <div className="flex flex-col gap-2.5 px-3 py-3">
+        {/* 项目：与「资料识别」页共用同一套项目，来源和版本才落在一起 */}
+        <section className="space-y-1.5 rounded-md border border-line bg-canvas/40 p-2.5">
+          <label htmlFor="project" className="block text-xs font-medium text-ink-2">本地项目</label>
+          <select
+            id="project"
+            value={projectId}
+            onChange={(event) => onProjectChange(event.target.value)}
+            className="h-8 w-full rounded-md border border-line bg-paper px-2 text-xs text-ink outline-none focus:border-brand"
           >
-            <SelectTrigger id="bookType" className="w-full">
-              <SelectValue placeholder="选择书种" />
-            </SelectTrigger>
+            <option value="">选择项目…</option>
+            {projects.map((project) => (
+              <option key={project.id} value={project.id}>
+                {project.name} · {project.grade} · {project.term}
+              </option>
+            ))}
+          </select>
+          {!projectId && (
+            <p className="text-[10px] leading-relaxed text-ink-3">
+              还没有项目，去「资料识别」新建一个。
+            </p>
+          )}
+        </section>
+
+        <section className="space-y-1.5 rounded-md border border-line bg-canvas/40 p-2.5">
+          <label htmlFor="outlineFile" className="block text-xs font-medium text-ink-2">部门大纲</label>
+          <input
+            id="outlineFile"
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            disabled={outlineLoading}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) onOutlineFileChange(file);
+              event.currentTarget.value = "";
+            }}
+            className="block w-full text-[10px] text-ink-3 file:mr-2 file:rounded file:border-0 file:bg-brand-tint file:px-2 file:py-1 file:text-[10px] file:font-medium file:text-brand-deep"
+          />
+          {outlineLoading && <p className="text-[10px] text-brand">正在读取大纲…</p>}
+          {outlineFileName && !outlineLoading && (
+            <p className="truncate text-[10px] text-ink-3" title={outlineFileName}>{outlineFileName}</p>
+          )}
+
+          {outlineProfile && (
+            <>
+              <label htmlFor="outlineLesson" className="block text-[10px] font-medium text-ink-2">选择目标 Lesson</label>
+              <select
+                id="outlineLesson"
+                value={selectedLessonKey ?? ""}
+                onChange={(event) => onOutlineLessonChange(event.target.value)}
+                className="h-8 w-full rounded-md border border-line bg-paper px-2 text-xs text-ink outline-none focus:border-brand"
+              >
+                {outlineProfile.lessons.map((lesson) => (
+                  <option key={lesson.lessonKey} value={lesson.lessonKey}>Lesson {lesson.lessonNumber} · {lesson.title || "未命名"}</option>
+                ))}
+              </select>
+
+              {selectedOutlineLesson && (
+                <p className="text-[10px] text-ink-2">旧版对应：{sourceUnitLabel(selectedOutlineLesson)}</p>
+              )}
+
+              <div className="border-t border-line pt-1.5">
+                <label htmlFor="legacySourceFile" className="block text-[10px] font-medium text-ink-2">
+                  旧版来源（OCR）
+                </label>
+                {ocrSources.length > 0 && (
+                  <select
+                    value=""
+                    onChange={(event) => {
+                      if (event.target.value) onSelectOcrSource(event.target.value);
+                      event.currentTarget.value = "";
+                    }}
+                    className="h-8 w-full rounded-md border border-line bg-paper px-2 text-[10px] text-ink outline-none focus:border-brand"
+                  >
+                    <option value="">从资料库选择已确认来源…</option>
+                    {ocrSources.map((source) => (
+                      <option key={source.jobId} value={source.jobId}>
+                        {source.originalName}（{source.pageCount} 页）
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <input
+                  id="legacySourceFile"
+                  type="file"
+                  accept=".md,.txt"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) onLegacyMarkdownFileChange(file);
+                    event.currentTarget.value = "";
+                  }}
+                  className="block w-full text-[10px] text-ink-3 file:mr-2 file:rounded file:border-0 file:bg-brand-tint file:px-2 file:py-1 file:text-[10px] file:font-medium file:text-brand-deep"
+                />
+              </div>
+
+              {outlineProfile.issues.length > 0 && (
+                <p className="text-[10px] text-amber-700">有 {outlineProfile.issues.length} 项单元格待确认。</p>
+              )}
+            </>
+          )}
+        </section>
+
+        <div className="grid grid-cols-[56px_1fr] items-center gap-2">
+          <label htmlFor="level" className="text-xs font-medium text-ink-2">年级</label>
+          <Select value={level} onValueChange={(value) => onLevelChange(value as Level)}>
+            <SelectTrigger id="level" className="h-8 w-full"><SelectValue placeholder="选择年级" /></SelectTrigger>
             <SelectContent>
-              {BOOK_TYPES.map((b) => (
-                <SelectItem key={b.id} value={b.id}>
-                  {b.label}
-                </SelectItem>
-              ))}
+              {LEVELS.map((item) => <SelectItem key={item} value={item}>{item}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>
-      </div>
 
-      <Separator />
-
-      <div className="flex-1 px-4 py-4">
-        <p className="mb-3 text-xs font-medium text-ink-2">印刷工单</p>
-        <dl className="space-y-2 font-mono text-xs">
-          <Field label="层级" value={level} />
-          <Field
-            label="书种"
-            value={BOOK_TYPES.find((b) => b.id === bookType)?.label ?? ""}
+        <div className="grid grid-cols-[56px_1fr] items-center gap-2">
+          <label htmlFor="lessonNumber" className="text-xs font-medium text-ink-2">Lesson</label>
+          <input
+            id="lessonNumber"
+            type="number"
+            min={1}
+            value={lessonNumber}
+            onChange={(event) => onLessonNumberChange(Number(event.target.value) || 1)}
+            className="h-8 rounded-md border border-line bg-paper px-2 text-xs text-ink outline-none focus:border-brand"
           />
-          <Field label="版式" value="A4 · 单栏" />
-          <Field label="印次" value="初印 · 01" />
-          <Field label="出片" value="2026-08-25" />
-          <Field label="色版" value={`${plateCount} / ${totalPlates}`} />
-        </dl>
-      </div>
+        </div>
 
-      <div className="border-t border-line px-4 py-3">
-        <p className="text-[11px] leading-relaxed text-ink-3">
-          切换书种会联动右侧模块列表。
-        </p>
+        <div className="grid grid-cols-[56px_1fr] items-center gap-2">
+          <label htmlFor="lessonTitle" className="text-xs font-medium text-ink-2">标题</label>
+          <input
+            id="lessonTitle"
+            value={lessonTitle}
+            onChange={(event) => onLessonTitleChange(event.target.value)}
+            placeholder="例如：Fond memories"
+            className="h-8 w-full rounded-md border border-line bg-paper px-2 text-xs text-ink outline-none placeholder:text-ink-3 focus:border-brand"
+          />
+        </div>
+
+        <div className="grid grid-cols-[56px_1fr] items-center gap-2">
+          <label htmlFor="bookType" className="text-xs font-medium text-ink-2">书种</label>
+          <Select value={bookType} onValueChange={(value) => onBookTypeChange(value as BookTypeId)}>
+            <SelectTrigger id="bookType" className="h-8 w-full"><SelectValue placeholder="选择书种" /></SelectTrigger>
+            <SelectContent>
+              {BOOK_TYPES.map((book) => <SelectItem key={book.id} value={book.id}>{book.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* 课型决定挂哪些模块：学生用书复习课没有 Let's explore! / Let's read! */}
+        <div className="grid grid-cols-[56px_1fr] items-center gap-2">
+          <label htmlFor="lessonType" className="text-xs font-medium text-ink-2">课型</label>
+          <Select value={lessonType} onValueChange={(value) => onLessonTypeChange(value as LessonType)}>
+            <SelectTrigger id="lessonType" className="h-8 w-full"><SelectValue placeholder="选择课型" /></SelectTrigger>
+            <SelectContent>
+              {LESSON_TYPES.map((item) => <SelectItem key={item.id} value={item.id}>{item.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* 该书种的模块生成：点击模块即生成该模块 */}
+        <section className="space-y-1.5 border-t border-line pt-2.5">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-xs font-medium text-ink-2">模块生成</span>
+            <span className="text-[10px] text-ink-3">{doneCount}/{modules.length || 0}</span>
+          </div>
+          <div className="space-y-1.5">
+            {modules.map((module, index) => {
+              const isThisLoading = loadingModule === module.id;
+              const isGenerated = generated.has(module.moduleKey ?? module.id);
+              const failure = failures[module.id];
+              return (
+                <div key={module.id}>
+                  <button
+                    type="button"
+                    data-action={`generate-${module.moduleKey ?? module.id}`}
+                    disabled={busy || !canGenerate}
+                    onClick={() => onGenerateModule(module)}
+                    className={cn(
+                      "flex w-full items-center gap-2.5 rounded-md border border-line bg-paper px-2.5 py-2 text-left transition-colors",
+                      "hover:border-brand/40 hover:bg-brand-tint/40",
+                      "disabled:cursor-not-allowed disabled:opacity-60",
+                      isGenerated && "border-brand/20 bg-brand-tint/30",
+                      failure && !isGenerated && "border-amber-300 bg-amber-50/50",
+                    )}
+                  >
+                    <PlateSwatch letter={plateLetter(index)} filled={isGenerated} tone={plateTone(index)} />
+                    <span className="min-w-0 flex-1 truncate text-xs text-ink">{module.label}</span>
+                    {isThisLoading ? (
+                      <Loader2 className="size-3.5 shrink-0 animate-spin text-brand" />
+                    ) : isGenerated ? (
+                      <Check className="size-3.5 shrink-0 text-reg" />
+                    ) : (
+                      <FileText className="size-3.5 shrink-0 text-ink-3" />
+                    )}
+                  </button>
+                  {failure && !isGenerated && (
+                    <p className="mt-1 pl-7 text-[10px] leading-relaxed text-amber-800">{failure}</p>
+                  )}
+                </div>
+              );
+            })}
+            {modules.length === 0 && (
+              <p className="rounded-md border border-dashed border-ink-3/50 px-2 py-3 text-center text-[10px] leading-relaxed text-ink-3">
+                该书种暂无模块目录
+              </p>
+            )}
+          </div>
+          {!canGenerate && modules.length > 0 && (
+            <p className="text-[10px] leading-relaxed text-ink-3">请先导入大纲、选择 Lesson 和旧版 OCR。</p>
+          )}
+        </section>
       </div>
     </aside>
   );
