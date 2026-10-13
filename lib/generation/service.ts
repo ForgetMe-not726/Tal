@@ -12,6 +12,7 @@ import type { SourceVerificationMode } from "@/lib/knowledge/types";
 import { saveSourceImport } from "@/lib/knowledge/repository";
 import type { OutlineLessonProfile } from "@/lib/outline/types";
 import { buildKnowledgeContext } from "@/lib/knowledge/context-builder";
+import { loadGrammarReference, renderGrammarBlock, type GrammarReference } from "@/lib/knowledge/grammar-reference";
 import { loadRelatedVersions, type RelatedVersion } from "@/lib/knowledge/related-content";
 import { retrieveKnowledge } from "@/lib/knowledge/retriever";
 import { buildMigrationPlan, type MigrationPlan } from "@/lib/generation/planner";
@@ -363,6 +364,7 @@ function buildPrompt(
   migrationPlan: MigrationPlan,
   relatedVersions: RelatedVersion[],
   request: GenerationRequest,
+  grammarReference: GrammarReference | null,
 ): string {
   const relatedBlock = relatedVersions
     .filter((item) => item.markdown)
@@ -396,6 +398,9 @@ function buildPrompt(
   // 骨架按（书种, 模块）取，且解析不出来时在更上游就抛错了，这里不再有兜底文案。
   const skeletonBlock = `本模块是「${outline.displayName}」。严格按下面的结构输出：\n\n${outline.outline}`;
 
+  // 本课语法参考：只带本课那一个语法点，取不到就如实说明（不拿模型印象冒充依据）
+  const grammarBlock = renderGrammarBlock(grammarReference);
+
   return `你是教材迁移流水线中的 Content Generator，负责把旧版教材内容迁移成新版教材的对应模块。
 
 任务：为 ${context.grade} ${context.term} Lesson ${context.lessonNumber}「${context.lessonTitle}」生成【${context.moduleLabel}】模块的新版初稿。
@@ -414,6 +419,9 @@ function buildPrompt(
 
 【目标大纲（这是目标要求，不是要输出的内容）】
 ${outlineBlock}
+
+【本课语法参考（写这个语法点时对照它，不要照抄）】
+${grammarBlock}
 
 【必须遵守的制作规则（这是约束，不是要输出的内容）】
 ${rulesBlock}
@@ -516,6 +524,11 @@ export async function generateModule(request: GenerationRequest, signal?: AbortS
     ),
   ]);
   throwIfAborted(signal);
+  // 本课语法参考：按大纲的语法字段取（只带本课那一个点）。取不到就如实为空，不假装有。
+  const grammarReference = await loadGrammarReference({
+    grammar: request.lessonProfile?.grammar ?? null,
+  });
+  throwIfAborted(signal);
   // 课时目标来自大纲，不依赖旧版来源，因此不要求检索到内容。
   const deterministic =
     outline.deterministic && request.lessonProfile
@@ -554,7 +567,9 @@ export async function generateModule(request: GenerationRequest, signal?: AbortS
     entries: retrievalResult.entries,
     rules: ruleSet.allRules,
   });
-  const prompt = deterministic ? "" : buildPrompt(context, outline, ruleSet, knowledgeContext.sourceText, migrationPlan, relatedVersions, request);
+  const prompt = deterministic
+    ? ""
+    : buildPrompt(context, outline, ruleSet, knowledgeContext.sourceText, migrationPlan, relatedVersions, request, grammarReference);
   throwIfAborted(signal);
   const ai = deterministic
     ? null

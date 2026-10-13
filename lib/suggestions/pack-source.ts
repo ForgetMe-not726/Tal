@@ -9,6 +9,7 @@
 
 import type { BookType, Grade } from "@/lib/db/types";
 import { getAppStore } from "@/lib/db/store";
+import { loadGrammarReference } from "@/lib/knowledge/grammar-reference";
 import { loadRelatedVersions } from "@/lib/knowledge/related-content";
 import { listConfirmedSources } from "@/lib/ocr/jobs";
 import { constraintConflicts, describeConflict } from "@/lib/rules/conflicts";
@@ -31,6 +32,13 @@ const MAX_RELATED_CHARS = 12000;
 const MAX_EVIDENCE_ENTRIES = 8;
 /** 参考资料正文片段长度。 */
 const EVIDENCE_EXCERPT_CHARS = 600;
+/**
+ * 本课语法参考进 Prompt 的预算。
+ *
+ * 取前段就够支撑判断：修改建议的 Prompt 里已经有规则库、跨书上下文和正文，
+ * 把整个语法点（8–20 KB）塞进去会挤掉真正要用的东西。完整内容在知识库里，按来源可查。
+ */
+const MAX_GRAMMAR_CHARS = 5000;
 
 export type SuggestionPackInput = {
   projectId?: string;
@@ -93,6 +101,36 @@ async function loadEvidence(input: SuggestionPackInput): Promise<PackEvidence[]>
       excerpt: row.content.slice(0, EVIDENCE_EXCERPT_CHARS),
     };
   });
+}
+
+/**
+ * 本课语法点的参考（`resources/knowledge/grammar/`，随包基线）。
+ *
+ * 这是修改建议最直接的外部依据：老师说"把难度调低"时，依据应当是本课语法点的
+ * 形式、使用条件与常见错误，而不是模型自己的印象。取不到就记缺口。
+ */
+async function loadGrammarEvidence(
+  lessonContext: Record<string, unknown> | null,
+  gaps: PackGap[],
+): Promise<PackEvidence | null> {
+  const grammar = typeof lessonContext?.grammar === "string" ? lessonContext.grammar : null;
+  if (!grammar?.trim()) return null;
+  const reference = await loadGrammarReference({ grammar, maxChars: MAX_GRAMMAR_CHARS });
+  if (!reference) {
+    gaps.push({
+      kind: "no_grammar_reference",
+      message: `本课语法（${grammar.split("\n")[0]?.trim()}）没有对应的语法参考，本次判断没有语法依据。`,
+    });
+    return null;
+  }
+  return {
+    label: `语法参考 · ${reference.pointId} ${reference.topic}`,
+    sourceRef: `grammar:${reference.pointId}`,
+    layer: "authoritative_standards",
+    page: null,
+    ocrJobId: null,
+    excerpt: reference.text,
+  };
 }
 
 export async function buildSuggestionContextPack(
@@ -171,6 +209,9 @@ export async function buildSuggestionContextPack(
   }
 
   const evidence = await loadEvidence(input);
+  // 本课语法点的参考放在最前：它是修改建议最直接的外部依据
+  const grammarReference = await loadGrammarEvidence(lessonContext, gaps);
+  if (grammarReference) evidence.unshift(grammarReference);
   if (evidence.length === 0) {
     gaps.push({
       kind: "no_reference_material",

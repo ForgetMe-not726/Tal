@@ -43,6 +43,7 @@ export type PackGap = {
   kind:
     | "no_reference_material"
     | "no_lesson_context"
+    | "no_grammar_reference"
     | "no_rules"
     | "budget"
     | "truncated"
