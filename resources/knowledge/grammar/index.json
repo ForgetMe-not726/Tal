@@ -1,0 +1,377 @@
+{
+  "generator": "scripts/build-grammar-reference.mjs",
+  "points": [
+    {
+      "id": "GR01",
+      "topic": "句子骨架、补足与一致",
+      "file": "GR01-句子骨架、补足与一致.md",
+      "sources": [
+        "English Grammar in Use · Unit 49 · p.110",
+        "English Grammar in Use · Unit 50 · p.112",
+        "English Grammar in Use · Unit 51 · p.114",
+        "English Grammar in Use · Unit 52 · p.116",
+        "English Grammar in Use · Unit 109 · p.230",
+        "English Grammar in Use · Unit 110 · p.232",
+        "English Grammar in Use · Unit 111 · p.234",
+        "English Grammar in Use · Unit 112 · p.236"
+      ]
+    },
+    {
+      "id": "GR02",
+      "topic": "名词、限定词、冠词与数量",
+      "file": "GR02-名词、限定词、冠词与数量.md",
+      "sources": [
+        "English Grammar in Use · Unit 69 · p.150",
+        "English Grammar in Use · Unit 70 · p.152",
+        "English Grammar in Use · Unit 71 · p.154",
+        "English Grammar in Use · Unit 72 · p.156",
+        "English Grammar in Use · Unit 73 · p.158",
+        "English Grammar in Use · Unit 74 · p.160",
+        "English Grammar in Use · Unit 75 · p.162",
+        "English Grammar in Use · Unit 76 · p.164",
+        "English Grammar in Use · Unit 77 · p.166",
+        "English Grammar in Use · Unit 78 · p.168",
+        "English Grammar in Use · Unit 79 · p.170",
+        "English Grammar in Use · Unit 80 · p.172",
+        "English Grammar in Use · Unit 81 · p.174",
+        "English Grammar in Use · Unit 85 · p.182",
+        "English Grammar in Use · Unit 86 · p.184",
+        "English Grammar in Use · Unit 87 · p.186",
+        "English Grammar in Use · Unit 88 · p.188",
+        "English Grammar in Use · Unit 89 · p.190",
+        "English Grammar in Use · Unit 90 · p.192",
+        "English Grammar in Use · Unit 91 · p.194"
+      ]
+    },
+    {
+      "id": "GR03",
+      "topic": "代词、照应与一致",
+      "file": "GR03-代词、照应与一致.md",
+      "sources": [
+        "English Grammar in Use · Unit 82 · p.176",
+        "English Grammar in Use · Unit 83 · p.178",
+        "English Grammar in Use · Unit 84 · p.180",
+        "English Grammar in Use · Unit 85 · p.182",
+        "English Grammar in Use · Unit 86 · p.184",
+        "English Grammar in Use · Unit 87 · p.186",
+        "English Grammar in Use · Unit 88 · p.188",
+        "English Grammar in Use · Unit 89 · p.190",
+        "English Grammar in Use · Unit 90 · p.192",
+        "English Grammar in Use · Unit 91 · p.194"
+      ]
+    },
+    {
+      "id": "GR04",
+      "topic": "形容词、副词、比较与焦点",
+      "file": "GR04-形容词、副词、比较与焦点.md",
+      "sources": [
+        "English Grammar in Use · Unit 98 · p.208",
+        "English Grammar in Use · Unit 99 · p.210",
+        "English Grammar in Use · Unit 100 · p.212",
+        "English Grammar in Use · Unit 101 · p.214",
+        "English Grammar in Use · Unit 102 · p.216",
+        "English Grammar in Use · Unit 103 · p.218",
+        "English Grammar in Use · Unit 104 · p.220",
+        "English Grammar in Use · Unit 105 · p.222",
+        "English Grammar in Use · Unit 106 · p.224",
+        "English Grammar in Use · Unit 107 · p.226",
+        "English Grammar in Use · Unit 108 · p.228",
+        "English Grammar in Use · Unit 109 · p.230",
+        "English Grammar in Use · Unit 110 · p.232",
+        "English Grammar in Use · Unit 111 · p.234",
+        "English Grammar in Use · Unit 112 · p.236"
+      ]
+    },
+    {
+      "id": "GR05",
+      "topic": "现在与过去",
+      "file": "GR05-现在与过去.md",
+      "sources": [
+        "English Grammar in Use · Unit 1 · p.14",
+        "English Grammar in Use · Unit 2 · p.16",
+        "English Grammar in Use · Unit 3 · p.18",
+        "English Grammar in Use · Unit 4 · p.20",
+        "English Grammar in Use · Unit 5 · p.22",
+        "English Grammar in Use · Unit 6 · p.24",
+        "English Grammar in Use · Unit 18 · p.48"
+      ]
+    },
+    {
+      "id": "GR06",
+      "topic": "完成体",
+      "file": "GR06-完成体.md",
+      "sources": [
+        "English Grammar in Use · Unit 7 · p.26",
+        "English Grammar in Use · Unit 8 · p.28",
+        "English Grammar in Use · Unit 9 · p.30",
+        "English Grammar in Use · Unit 10 · p.32",
+        "English Grammar in Use · Unit 11 · p.34",
+        "English Grammar in Use · Unit 12 · p.36",
+        "English Grammar in Use · Unit 13 · p.38",
+        "English Grammar in Use · Unit 14 · p.40",
+        "English Grammar in Use · Unit 15 · p.42",
+        "English Grammar in Use · Unit 16 · p.44"
+      ]
+    },
+    {
+      "id": "GR07",
+      "topic": "将来与过去将来",
+      "file": "GR07-将来与过去将来.md",
+      "sources": [
+        "English Grammar in Use · Unit 19 · p.50",
+        "English Grammar in Use · Unit 20 · p.52",
+        "English Grammar in Use · Unit 21 · p.54",
+        "English Grammar in Use · Unit 22 · p.56",
+        "English Grammar in Use · Unit 23 · p.58",
+        "English Grammar in Use · Unit 24 · p.60",
+        "English Grammar in Use · Unit 25 · p.62"
+      ]
+    },
+    {
+      "id": "GR08",
+      "topic": "情态动词、半情态与情态短语",
+      "file": "GR08-情态动词、半情态与情态短语.md",
+      "sources": [
+        "English Grammar in Use · Unit 26 · p.64",
+        "English Grammar in Use · Unit 27 · p.66",
+        "English Grammar in Use · Unit 28 · p.68",
+        "English Grammar in Use · Unit 29 · p.70",
+        "English Grammar in Use · Unit 30 · p.72",
+        "English Grammar in Use · Unit 31 · p.74",
+        "English Grammar in Use · Unit 32 · p.76",
+        "English Grammar in Use · Unit 33 · p.78",
+        "English Grammar in Use · Unit 34 · p.80",
+        "English Grammar in Use · Unit 35 · p.82",
+        "English Grammar in Use · Unit 36 · p.84",
+        "English Grammar in Use · Unit 37 · p.86"
+      ]
+    },
+    {
+      "id": "GR09",
+      "topic": "被动、get被动与使役",
+      "file": "GR09-被动、get被动与使役.md",
+      "sources": [
+        "English Grammar in Use · Unit 42 · p.96",
+        "English Grammar in Use · Unit 43 · p.98",
+        "English Grammar in Use · Unit 44 · p.100",
+        "English Grammar in Use · Unit 45 · p.102",
+        "English Grammar in Use · Unit 46 · p.104"
+      ]
+    },
+    {
+      "id": "GR10",
+      "topic": "非谓语、动词搭配与补足",
+      "file": "GR10-非谓语、动词搭配与补足.md",
+      "sources": [
+        "English Grammar in Use · Unit 53 · p.118",
+        "English Grammar in Use · Unit 54 · p.120",
+        "English Grammar in Use · Unit 55 · p.122",
+        "English Grammar in Use · Unit 56 · p.124",
+        "English Grammar in Use · Unit 57 · p.126",
+        "English Grammar in Use · Unit 58 · p.128",
+        "English Grammar in Use · Unit 59 · p.130",
+        "English Grammar in Use · Unit 60 · p.132",
+        "English Grammar in Use · Unit 61 · p.134",
+        "English Grammar in Use · Unit 62 · p.136",
+        "English Grammar in Use · Unit 63 · p.138",
+        "English Grammar in Use · Unit 64 · p.140",
+        "English Grammar in Use · Unit 65 · p.142",
+        "English Grammar in Use · Unit 66 · p.144",
+        "English Grammar in Use · Unit 67 · p.146",
+        "English Grammar in Use · Unit 68 · p.148"
+      ]
+    },
+    {
+      "id": "GR11",
+      "topic": "疑问句与附加问句",
+      "file": "GR11-疑问句与附加问句.md",
+      "sources": [
+        "English Grammar in Use · Unit 49 · p.110",
+        "English Grammar in Use · Unit 50 · p.112",
+        "English Grammar in Use · Unit 51 · p.114",
+        "English Grammar in Use · Unit 52 · p.116"
+      ]
+    },
+    {
+      "id": "GR12",
+      "topic": "间接引语",
+      "file": "GR12-间接引语.md",
+      "sources": [
+        "English Grammar in Use · Unit 47 · p.106",
+        "English Grammar in Use · Unit 48 · p.108",
+        "English Grammar in Use · Unit 49 · p.110",
+        "English Grammar in Use · Unit 50 · p.112"
+      ]
+    },
+    {
+      "id": "GR13",
+      "topic": "条件句与 wish",
+      "file": "GR13-条件句与 wish.md",
+      "sources": [
+        "English Grammar in Use · Unit 38 · p.88",
+        "English Grammar in Use · Unit 39 · p.90",
+        "English Grammar in Use · Unit 40 · p.92",
+        "English Grammar in Use · Unit 41 · p.94",
+        "English Grammar in Use · Unit 114 · p.240",
+        "English Grammar in Use · Unit 115 · p.242"
+      ]
+    },
+    {
+      "id": "GR14",
+      "topic": "定语从句与复杂名词短语",
+      "file": "GR14-定语从句与复杂名词短语.md",
+      "sources": [
+        "English Grammar in Use · Unit 92 · p.196",
+        "English Grammar in Use · Unit 93 · p.198",
+        "English Grammar in Use · Unit 94 · p.200",
+        "English Grammar in Use · Unit 95 · p.202",
+        "English Grammar in Use · Unit 96 · p.204",
+        "English Grammar in Use · Unit 97 · p.206"
+      ]
+    },
+    {
+      "id": "GR15",
+      "topic": "名词从句、状语从句与连词",
+      "file": "GR15-名词从句、状语从句与连词.md",
+      "sources": [
+        "English Grammar in Use · Unit 50 · p.112",
+        "English Grammar in Use · Unit 64 · p.140",
+        "English Grammar in Use · Unit 113 · p.238",
+        "English Grammar in Use · Unit 114 · p.240",
+        "English Grammar in Use · Unit 115 · p.242",
+        "English Grammar in Use · Unit 116 · p.244",
+        "English Grammar in Use · Unit 117 · p.246",
+        "English Grammar in Use · Unit 118 · p.248",
+        "English Grammar in Use · Unit 119 · p.250",
+        "English Grammar in Use · Unit 120 · p.252"
+      ]
+    },
+    {
+      "id": "GR16",
+      "topic": "介词、搭配与短语动词",
+      "file": "GR16-介词、搭配与短语动词.md",
+      "sources": [
+        "English Grammar in Use · Unit 60 · p.132",
+        "English Grammar in Use · Unit 61 · p.134",
+        "English Grammar in Use · Unit 62 · p.136",
+        "English Grammar in Use · Unit 63 · p.138",
+        "English Grammar in Use · Unit 64 · p.140",
+        "English Grammar in Use · Unit 65 · p.142",
+        "English Grammar in Use · Unit 66 · p.144",
+        "English Grammar in Use · Unit 121 · p.254",
+        "English Grammar in Use · Unit 122 · p.256",
+        "English Grammar in Use · Unit 123 · p.258",
+        "English Grammar in Use · Unit 124 · p.260",
+        "English Grammar in Use · Unit 125 · p.262",
+        "English Grammar in Use · Unit 126 · p.264",
+        "English Grammar in Use · Unit 127 · p.266",
+        "English Grammar in Use · Unit 128 · p.268",
+        "English Grammar in Use · Unit 129 · p.270",
+        "English Grammar in Use · Unit 130 · p.272",
+        "English Grammar in Use · Unit 131 · p.274",
+        "English Grammar in Use · Unit 132 · p.276",
+        "English Grammar in Use · Unit 133 · p.278",
+        "English Grammar in Use · Unit 134 · p.280",
+        "English Grammar in Use · Unit 135 · p.282",
+        "English Grammar in Use · Unit 136 · p.284",
+        "English Grammar in Use · Unit 137 · p.286",
+        "English Grammar in Use · Unit 138 · p.288",
+        "English Grammar in Use · Unit 139 · p.290",
+        "English Grammar in Use · Unit 140 · p.292",
+        "English Grammar in Use · Unit 141 · p.294",
+        "English Grammar in Use · Unit 142 · p.296",
+        "English Grammar in Use · Unit 143 · p.298",
+        "English Grammar in Use · Unit 144 · p.300",
+        "English Grammar in Use · Unit 145 · p.302"
+      ]
+    },
+    {
+      "id": "GR17",
+      "topic": "衔接、信息结构与复杂度",
+      "file": "GR17-衔接、信息结构与复杂度.md",
+      "sources": [
+        "English Grammar in Use · Unit 92 · p.196",
+        "English Grammar in Use · Unit 93 · p.198",
+        "English Grammar in Use · Unit 94 · p.200",
+        "English Grammar in Use · Unit 95 · p.202",
+        "English Grammar in Use · Unit 96 · p.204",
+        "English Grammar in Use · Unit 97 · p.206",
+        "English Grammar in Use · Unit 98 · p.208",
+        "English Grammar in Use · Unit 99 · p.210",
+        "English Grammar in Use · Unit 100 · p.212",
+        "English Grammar in Use · Unit 101 · p.214",
+        "English Grammar in Use · Unit 102 · p.216",
+        "English Grammar in Use · Unit 103 · p.218",
+        "English Grammar in Use · Unit 104 · p.220",
+        "English Grammar in Use · Unit 105 · p.222",
+        "English Grammar in Use · Unit 106 · p.224",
+        "English Grammar in Use · Unit 107 · p.226",
+        "English Grammar in Use · Unit 108 · p.228",
+        "English Grammar in Use · Unit 109 · p.230",
+        "English Grammar in Use · Unit 110 · p.232",
+        "English Grammar in Use · Unit 111 · p.234",
+        "English Grammar in Use · Unit 112 · p.236",
+        "English Grammar in Use · Unit 113 · p.238",
+        "English Grammar in Use · Unit 114 · p.240",
+        "English Grammar in Use · Unit 115 · p.242",
+        "English Grammar in Use · Unit 116 · p.244",
+        "English Grammar in Use · Unit 117 · p.246",
+        "English Grammar in Use · Unit 118 · p.248",
+        "English Grammar in Use · Unit 119 · p.250",
+        "English Grammar in Use · Unit 120 · p.252"
+      ]
+    },
+    {
+      "id": "GR18",
+      "topic": "词形、构词、拼写与缩略",
+      "file": "GR18-词形、构词、拼写与缩略.md",
+      "sources": [
+        "外研社英语语法大全 · 第 31 章 · p.666–670"
+      ]
+    },
+    {
+      "id": "GR19",
+      "topic": "否定与否定范围",
+      "file": "GR19-否定与否定范围.md",
+      "sources": [
+        "外研社英语语法大全 · 第 24 章 · p.544–559"
+      ]
+    },
+    {
+      "id": "GR20",
+      "topic": "倒装、强调与存在句",
+      "file": "GR20-倒装、强调与存在句.md",
+      "sources": [
+        "外研社英语语法大全 · 第 25 章 · p.560–569"
+      ]
+    },
+    {
+      "id": "GR21",
+      "topic": "语域、口语语法与教材表达",
+      "file": "GR21-语域、口语语法与教材表达.md",
+      "sources": [
+        "外研社英语语法大全 · 第 1 章 · p.36–46",
+        "外研社英语语法大全 · 第 29 章 · p.620–665"
+      ]
+    },
+    {
+      "id": "GR22",
+      "topic": "标点与句法边界",
+      "file": "GR22-标点与句法边界.md",
+      "sources": [
+        "外研社英语语法大全 · 第 32 章 · p.671–689"
+      ]
+    }
+  ],
+  "labels": {
+    "反义疑问句": "GR11",
+    "附加疑问": "GR11",
+    "反身代词": "GR03",
+    "非人称被动": "GR09",
+    "被动语态": "GR09",
+    "have/get sth. done": "GR09",
+    "比较级": "GR04",
+    "最高级": "GR04",
+    "同级比较": "GR04"
+  }
+}
