@@ -480,6 +480,18 @@ export function getAiProvider(): AiProvider {
   throw new Error(`未知的 AI_PROVIDER:${provider}(支持 mock / anthropic-compatible / openai-compatible)`);
 }
 
+/**
+ * 是否配了**真实**网关（mock 不算）。
+ *
+ * 给"要不要走模型"这类可选步骤用：没配就走确定性路径，不白跑一次调用、
+ * 也不把 mock 的空返回当成真结果。
+ */
+export function aiConfigured(): boolean {
+  const provider = (process.env.AI_PROVIDER ?? "mock").trim() || "mock";
+  if (provider === "mock") return false;
+  return Boolean(process.env.AI_BASE_URL?.trim() && process.env.AI_API_KEY?.trim());
+}
+
 /** 统一入口。生产数据从第一天记录 usage/latency(profile.md 三十二),后续在此落库。 */
 export async function aiComplete(req: AiRequest): Promise<AiResult> {
   const provider = getAiProvider();

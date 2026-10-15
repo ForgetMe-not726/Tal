@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, ClipboardCheck, Database, FilePlus2 } from "lucide-react";
+import { AssistantPanel } from "@/components/assistant/AssistantPanel";
 import { RuleLibrary } from "@/components/console/RuleLibrary";
 import { listRulesWithVersions } from "@/lib/rules/service";
 import { FLOW_UNITS } from "@/lib/mock";
@@ -110,7 +111,12 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* 模块 B：规则库管理（灰箱接口） */}
+        {/* 模块 B：通用助手（只读检索，DESIGN §193-199） */}
+        <div className="mt-10">
+          <AssistantPanel />
+        </div>
+
+        {/* 模块 C：规则库管理（灰箱接口） */}
         <section className="mt-10">
           <h2 className="text-base font-semibold tracking-tight">规则库管理</h2>
           <p className="mt-0.5 text-sm text-ink-3">

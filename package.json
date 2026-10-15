@@ -18,7 +18,7 @@
     "test:legacy-sb": "node --experimental-strip-types scripts/test-legacy-student-book.mjs",
     "test:source": "node --experimental-strip-types scripts/test-source-selection.mjs",
     "test:store": "node --experimental-strip-types scripts/test-file-store.mjs",
-    "test": "npm run test:store && npm run test:rules && npm run test:mvp && npm run test:knowledge && npm run test:outline && npm run test:legacy-markdown && npm run test:rule-markdown && npm run test:modules && npm run test:legacy-sb && npm run test:legacy-wb && npm run test:source && npm run test:coverage && npm run test:objectives && npm run test:round-trip && npm run test:html-tables && npm run test:ocr-normalize && npm run test:ocr-jobs && npm run test:review-pipeline && npm run test:review-report && npm run test:review-jobs && npm run test:review-skill && npm run test:suggestion && npm run test:grammar && npm run test:export",
+    "test": "npm run test:store && npm run test:rules && npm run test:mvp && npm run test:knowledge && npm run test:outline && npm run test:legacy-markdown && npm run test:rule-markdown && npm run test:modules && npm run test:legacy-sb && npm run test:legacy-wb && npm run test:source && npm run test:coverage && npm run test:objectives && npm run test:round-trip && npm run test:html-tables && npm run test:ocr-normalize && npm run test:ocr-jobs && npm run test:review-pipeline && npm run test:review-report && npm run test:review-jobs && npm run test:review-skill && npm run test:suggestion && npm run test:grammar && npm run test:assistant && npm run test:export",
     "test:legacy-wb": "node --experimental-strip-types scripts/test-legacy-workbook.mjs",
     "test:coverage": "node --experimental-strip-types scripts/test-coverage.mjs",
     "test:objectives": "node --experimental-strip-types scripts/test-objectives.mjs",
@@ -31,7 +31,8 @@
     "test:review-jobs": "node --experimental-strip-types scripts/test-review-jobs.mjs",
     "test:review-skill": "node --experimental-strip-types scripts/test-review-skill-baseline.mjs",
     "test:suggestion": "node --experimental-strip-types scripts/test-suggestion-context.mjs",
-    "test:grammar": "node --experimental-strip-types scripts/test-grammar-reference.mjs"
+    "test:grammar": "node --experimental-strip-types scripts/test-grammar-reference.mjs",
+    "test:assistant": "node --experimental-strip-types scripts/test-assistant.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
