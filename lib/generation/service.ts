@@ -13,7 +13,9 @@ import { saveSourceImport } from "@/lib/knowledge/repository";
 import type { OutlineLessonProfile } from "@/lib/outline/types";
 import { buildKnowledgeContext } from "@/lib/knowledge/context-builder";
 import { loadGrammarReference, renderGrammarBlock, type GrammarReference } from "@/lib/knowledge/grammar-reference";
+import { findExemplars, renderExemplarBlock, type CollectionChunk } from "@/lib/knowledge/collections";
 import { loadRelatedVersions, type RelatedVersion } from "@/lib/knowledge/related-content";
+import { htmlTablesToMarkdown } from "@/lib/markdown/html-tables";
 import { retrieveKnowledge } from "@/lib/knowledge/retriever";
 import { buildMigrationPlan, type MigrationPlan } from "@/lib/generation/planner";
 import { buildDeterministicObjectives } from "@/lib/generation/objectives";
@@ -21,7 +23,6 @@ import { checkVocabularyCoverage } from "@/lib/generation/coverage";
 import { resolveModuleOutlineByKey } from "@/lib/modules/service";
 import type { ModuleOutline } from "@/lib/modules/directory";
 import { sourceUnitForTargetLesson } from "@/lib/knowledge/legacy-markdown";
-import { htmlTablesToMarkdown } from "@/lib/markdown/html-tables";
 
 export class GenerationServiceError extends Error {}
 
@@ -365,6 +366,7 @@ function buildPrompt(
   relatedVersions: RelatedVersion[],
   request: GenerationRequest,
   grammarReference: GrammarReference | null,
+  exemplars: CollectionChunk[],
 ): string {
   const relatedBlock = relatedVersions
     .filter((item) => item.markdown)
@@ -400,6 +402,8 @@ function buildPrompt(
 
   // 本课语法参考：只带本课那一个语法点，取不到就如实说明（不拿模型印象冒充依据）
   const grammarBlock = renderGrammarBlock(grammarReference);
+  // 同模块范本：已定稿教材里同一个模块长什么样——比"输出结构"更能说明详略与排版
+  const exemplarBlock = renderExemplarBlock(exemplars, htmlTablesToMarkdown);
 
   return `你是教材迁移流水线中的 Content Generator，负责把旧版教材内容迁移成新版教材的对应模块。
 
@@ -422,6 +426,9 @@ ${outlineBlock}
 
 【本课语法参考（写这个语法点时对照它，不要照抄）】
 ${grammarBlock}
+
+【同模块范本（已定稿教材，照着它的结构、详略和排版写；内容必须用本课来源）】
+${exemplarBlock}
 
 【必须遵守的制作规则（这是约束，不是要输出的内容）】
 ${rulesBlock}
@@ -528,6 +535,15 @@ export async function generateModule(request: GenerationRequest, signal?: AbortS
   const grammarReference = await loadGrammarReference({
     grammar: request.lessonProfile?.grammar ?? null,
   });
+  // 同书种、同模块的范本（只取一份，按预算截断）
+  const exemplars = (
+    await findExemplars({
+      bookType: context.bookType,
+      moduleKey: context.moduleKey,
+      maxChunks: 1,
+      maxChars: 6000,
+    })
+  ).chunks;
   throwIfAborted(signal);
   // 课时目标来自大纲，不依赖旧版来源，因此不要求检索到内容。
   const deterministic =
@@ -569,7 +585,17 @@ export async function generateModule(request: GenerationRequest, signal?: AbortS
   });
   const prompt = deterministic
     ? ""
-    : buildPrompt(context, outline, ruleSet, knowledgeContext.sourceText, migrationPlan, relatedVersions, request, grammarReference);
+    : buildPrompt(
+        context,
+        outline,
+        ruleSet,
+        knowledgeContext.sourceText,
+        migrationPlan,
+        relatedVersions,
+        request,
+        grammarReference,
+        exemplars,
+      );
   throwIfAborted(signal);
   const ai = deterministic
     ? null

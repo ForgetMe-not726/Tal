@@ -216,11 +216,12 @@ function HitCard({ hit }: { hit: AssistantHit }) {
         </span>
         <span className="text-ink-3">{SOURCE_KIND_LABEL[hit.kind]}</span>
         <span className="truncate text-ink-2">{location.join(" · ")}</span>
-        {hit.ocrJobId && hit.pageIndex != null && (
+        {(hit.ocrJobId || hit.pageImageUrl) && hit.pageIndex != null && (
           <span className="ml-auto">
             <PageEvidence
               label={hit.documentName}
               jobId={hit.ocrJobId}
+              src={hit.pageImageUrl}
               pageIndex={hit.pageIndex}
               box={hit.box}
             />

@@ -9,7 +9,7 @@ import type { BookType } from "@/lib/db/types";
 import type { AssistantSourceKind } from "./types.ts";
 
 const BOOK_TYPES: readonly BookType[] = ["student", "workbook", "knowledge", "vocab"];
-const SOURCE_KINDS: readonly AssistantSourceKind[] = ["source", "rule", "version", "reference"];
+const SOURCE_KINDS: readonly AssistantSourceKind[] = ["source", "rule", "version", "reference", "exemplar"];
 
 /** 中文疑问句里的功能词：退回关键词直检时要去掉，否则"查找""包含"会变成检索词。 */
 const STOPWORDS = [

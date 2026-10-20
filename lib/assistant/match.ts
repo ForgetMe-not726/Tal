@@ -30,9 +30,10 @@ const COUNT_CAP = 5;
  */
 const KIND_PRIORITY: Record<AssistantSourceKind, number> = {
   source: 0,
-  version: 1,
-  reference: 2,
-  rule: 3,
+  exemplar: 1,
+  version: 2,
+  reference: 3,
+  rule: 4,
 };
 
 function normalize(text: string): string {
@@ -60,6 +61,20 @@ function keywordPattern(keyword: string): RegExp {
   const escaped = escapeRegExp(keyword);
   const ascii = /^[\x20-\x7e]+$/u.test(keyword);
   return new RegExp(ascii ? `\\b${escaped}\\b` : escaped, "giu");
+}
+
+/** 命中的**页**：正文里保留了 `<!-- page N -->` 标记，按标记往下数即可。 */
+function firstMatchPage(text: string, keywords: readonly string[]): number | null {
+  let page = null;
+  for (const line of text.split("\n")) {
+    const marker = /^<!-- page (\d+) -->$/u.exec(line.trim());
+    if (marker) {
+      page = Number(marker[1]);
+      continue;
+    }
+    if (page != null && keywords.some((keyword) => keywordPattern(keyword).test(line))) return page;
+  }
+  return page;
 }
 
 /** 命中片段：取第一次命中的位置前后加一点上下文。 */
@@ -103,6 +118,19 @@ export type SearchCorpora = {
     markdown: string;
   }>;
   references: Array<{ name: string; text: string }>;
+  /** 范本教材（知识库集合按模块切好的正文，带 `<!-- page N -->` 标记）。 */
+  collectionDocs?: Array<{
+    collectionId: string;
+    collectionTitle: string;
+    bookType: string;
+    lessonNumber: number;
+    lessonTitle: string;
+    moduleKey: string;
+    pages: [number, number] | null;
+    text: string;
+  }>;
+  /** 集合里一共有多少个模块（用于如实说明截断）。 */
+  collectionTotal?: number;
 };
 
 /** 在已收集的语料上做字面检索。**纯函数**，便于单测。 */
@@ -228,6 +256,37 @@ export function searchCorpora(
     }
   }
 
+    if (kindAllowed("exemplar")) {
+      for (const doc of corpora.collectionDocs ?? []) {
+        if (!bookAllowed(doc.bookType)) continue;
+        if (!moduleAllowed(doc.moduleKey)) continue;
+        if (!lessonAllowed(doc.lessonNumber)) continue;
+        const matched = snippetOf(doc.text, keywords);
+        if (!matched) continue;
+        const page = firstMatchPage(doc.text, keywords);
+        hits.push({
+          kind: "exemplar",
+          snippet: matched.snippet,
+          sourceRef: `collection:${doc.collectionId}/${doc.bookType}/lesson-${String(doc.lessonNumber).padStart(2, "0")}/${doc.moduleKey}`,
+          documentName: `${doc.collectionTitle} · ${doc.moduleKey}`,
+          bookType: doc.bookType,
+          lessonNumber: doc.lessonNumber,
+          moduleKey: doc.moduleKey,
+          pageIndex: page,
+          blockId: null,
+          box: null,
+          status: "confirmed",
+          ocrJobId: null,
+          ...(page == null
+            ? {}
+            : {
+                pageImageUrl: `/api/knowledge/collections/${encodeURIComponent(doc.collectionId)}/ocr/${doc.bookType}/pages/p${String(page).padStart(4, "0")}.jpg`,
+              }),
+          score: Math.min(matched.count, COUNT_CAP) + titleBonus(`${doc.moduleKey} ${doc.collectionTitle}`, keywords),
+        });
+      }
+    }
+
   const searched: AssistantSearched = {
     scope: query.scope,
     projects: corpora.projects.length,
@@ -236,6 +295,7 @@ export function searchCorpora(
     rules: corpora.rules.length,
     versions: corpora.versions.length,
     references: corpora.references.length,
+    exemplars: (corpora.collectionDocs ?? []).length,
     keywords,
   };
 

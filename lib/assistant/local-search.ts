@@ -19,11 +19,14 @@ import { join } from "node:path";
 import { getAppStore } from "@/lib/db/store";
 import { contentToMarkdown } from "@/lib/knowledge/related-content";
 import { knowledgeDir } from "@/lib/workspace/paths";
+import { listCollectionModules, readCollectionChunk } from "@/lib/knowledge/collections";
 import { searchCorpora, type SearchCorpora } from "./match.ts";
 import type { AssistantQuery, AssistantResult } from "./types.ts";
 
 /** 单个语料最多扫描多少字符，避免一条超长正文把检索拖住。 */
 const MAX_SCAN_CHARS = 200_000;
+/** 范本教材最多读多少个模块文件（集合变大后先截断，并在缺口里说明）。 */
+const MAX_COLLECTION_DOCS = 300;
 
 /**
  * 把要搜的东西一次性读出来。
@@ -93,6 +96,7 @@ export async function collectCorpora(query: AssistantQuery): Promise<SearchCorpo
     scope: scopeByRule.get(row.id) ?? "global",
   }));
 
+  const { docs: collectionDocs, total: collectionTotal } = await collectCollectionDocs();
   return {
     projects,
     lessons,
@@ -100,7 +104,34 @@ export async function collectCorpora(query: AssistantQuery): Promise<SearchCorpo
     rules,
     versions,
     references: await collectGrammarReferences(),
+    collectionDocs,
+    collectionTotal,
   };
+}
+
+/** 范本教材：按 manifest 找到模块文件再读正文（带页码标记）。 */
+async function collectCollectionDocs(input?: { bookType?: string; lessonNumber?: number; moduleKey?: string }) {
+  const rows = await listCollectionModules({
+    bookType: input?.bookType as never,
+    lessonNumber: input?.lessonNumber,
+    moduleKey: input?.moduleKey,
+  });
+  const docs: SearchCorpora["collectionDocs"] = [];
+  for (const row of rows.slice(0, MAX_COLLECTION_DOCS)) {
+    const chunk = await readCollectionChunk(row.manifest, row.book, row.lesson, row.module);
+    if (!chunk) continue;
+    docs.push({
+      collectionId: chunk.collectionId,
+      collectionTitle: chunk.collectionTitle,
+      bookType: chunk.bookType,
+      lessonNumber: chunk.lessonNumber,
+      lessonTitle: chunk.lessonTitle,
+      moduleKey: chunk.moduleKey,
+      pages: chunk.pages,
+      text: chunk.text.slice(0, MAX_SCAN_CHARS),
+    });
+  }
+  return { docs, total: rows.length };
 }
 
 /** 语法参考知识库：按文件读进来，文件名当标题。 */
@@ -145,6 +176,11 @@ export async function searchAssistant(query: AssistantQuery): Promise<AssistantR
   const gaps: string[] = [];
   if (corpora.references.length === 0) {
     gaps.push("工作区里没有装语法参考知识库（knowledge/grammar/），本次没有搜到参考资料。");
+  }
+  if ((corpora.collectionTotal ?? 0) > (corpora.collectionDocs ?? []).length) {
+    gaps.push(
+      `知识库里的资料集合有 ${corpora.collectionTotal} 个模块，本次只检索了前 ${(corpora.collectionDocs ?? []).length} 个（按数量上限截断）。`,
+    );
   }
   return { ...result, gaps };
 }

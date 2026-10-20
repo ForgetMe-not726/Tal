@@ -1,27 +1,59 @@
-# 参考资料基线（随安装包分发）
+# 知识库（随安装包分发）
 
-本目录的内容会**随安装包分发给每位老师**，首次启动时复制到工作区的 `knowledge/` 下，
-保证所有老师拿到同一套参考资料。之后以工作区里的副本为准。
+本目录的内容会**随安装包分发给每位老师**，首次启动时复制到工作区的 `knowledge/` 下。
+之后以工作区里的副本为准；老师新增的资料只进工作区，不回写这里。
 
-## 这里放什么
+## 目录结构
 
-按 profile.md §3.3 的知识分层：
+```
+knowledge/
+  collections/                  一次投入的一批资料（可扩展）
+    <collection-id>/
+      manifest.json             批次元数据 + 索引（书种/课/模块 → 文件、页范围）
+      ocr/<book>/               content.md / structure.json / pages/ / assets/ / original.pdf
+      modules/<bookType>/lesson-NN/<moduleKey>.md   按模块切好的正文（带页码标记）
+  grammar/                      语法参考（按语法点 GR01–GR22，含 index.json）
+  review-standards/             审校判据（公司审校标准，按小节引用）
+  entries.json                  工作区级知识条目（预留；目前没有生产写入路径）
+```
 
-| 子目录 | 放什么 | 权重 |
-|---|---|---|
-| `cambridge/` | Cambridge 官方大纲、CEFR、官方词表、经确认的考试要求 | 权威标准：需要精确匹配的词表、等级与结构约束应转成结构化条目 |
-| `other/` | 真题、教辅等参考资料 | 仅参考，**不等权**——不能被表述成硬性标准 |
+## 四类资料与各自的用途
 
-参考资料的原 PDF 与结构化条目都放这里；结构化条目写进 `entries.json`
-（工作区级，不属于任何一课）。
+| 资料 | 位置 | 被谁用 | 取用方式 |
+|---|---|---|---|
+| **范本教材**（已定稿的新版教材） | `collections/<id>/`（`kind: exemplar`） | 生成 | 按**书种 + 模块**取同模块范本，随 Prompt 带一份，教模型"这个模块该长什么样" |
+| **剑桥权威资料 / 参考** | `collections/<id>/`（`kind: cambridge` / `reference`） | 通用助手、修改建议 | 检索命中后按来源定位取用 |
+| **语法参考** | `grammar/` | 生成、修改建议 | 按大纲的语法字段 → `index.json.labels` → 取那一个语法点 |
+| **审校判据** | `review-standards/` | 审校 | 按规则的 `standard_refs` 精确取小节 |
+
+**为什么按模块切**：生成要的是"同书种、同模块"的范本，按结构化键直接取就是 O(1)；
+不做"整本 PDF 全文向量检索"（profile §6.2：Structured Retrieval 优先）。
+
+## 新增一批资料
+
+用 `scripts/ingest-knowledge-collection.mjs`（可重跑，不手抄）：
+
+```bash
+node --experimental-strip-types scripts/ingest-knowledge-collection.mjs \
+  --id=autumn-2026-l5 --title=2026秋下L5完成版教材 \
+  --kind=exemplar --grade=L5 --term=autumn \
+  --book=student=<MinerU 输出目录> --book=workbook=<...> --book=knowledge=<...>
+```
+
+脚本做三件事：① 归一化 OCR 产物（正文/结构/页图/资产/原件）；② 按课与模块标题切分；
+③ 写 `manifest.json`。切分用的是 `lib/modules/directory.ts` 里的模块标题，
+不在这里硬编码栏目名。
+
+`manifest.json` 是**索引**，可以从 `ocr/` 与 `modules/` 重建；文件才是事实源
+（profile §3：任何索引都必须可重建，不能成为唯一事实源）。
 
 ## 与教材来源的区别
 
-- **参考资料**（本目录）：外部权威与参考，谁都能拿到，随包分发。
-- **教材来源**（工作区 `projects/<id>/lessons/<key>/sources.json`）：老师的旧版公司教材，
-  经老师确认后才是 Production Source，**不随包分发**。
+- **知识库资料**（本目录）：范本、权威标准、参考——随包分发或按批投入，跨项目可用。
+- **教材来源**（`projects/<id>/lessons/<key>/sources.json`）：老师的旧版教材，
+  经确认后才是 Production Source，**不随包分发**。
 
-## 目前为什么是空的
+## 许可
 
-Cambridge 资料目录与授权范围尚未确认（见 `question.md` 的 Q-CORE-017）。
-在确认前不放任何第三方材料，避免把未经许可的内容随包分发出去。
+第三方资料随包分发前必须确认授权口径（见 `question.md` 的 Q-CORE-017 / Q-CORE-032）。
+`manifest.json` 的 `license` 字段用于记录每一批资料的来源与许可说明。

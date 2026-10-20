@@ -16,13 +16,14 @@ import type { BookType } from "@/lib/db/types";
 export type AssistantScope = "workspace" | "project";
 
 /** 命中来自哪一类资料。 */
-export type AssistantSourceKind = "source" | "rule" | "version" | "reference";
+export type AssistantSourceKind = "source" | "rule" | "version" | "reference" | "exemplar";
 
 export const SOURCE_KIND_LABEL: Record<AssistantSourceKind, string> = {
   source: "已确认来源",
   rule: "规则",
   version: "当前项目正文",
   reference: "参考资料",
+  exemplar: "范本教材",
 };
 
 /** 最小查询输入（§4 逐项对应）。 */
@@ -66,6 +67,8 @@ export type AssistantHit = {
   status: "pending" | "confirmed";
   /** 能定位到已确认的 OCR 任务时带上，供「查看原页」。 */
   ocrJobId: string | null;
+  /** 集合资料的页图地址（没有 OCR 任务时用它）。 */
+  pageImageUrl?: string;
   /** **仅作排序提示**，不作正确性结论。 */
   score: number;
 };
@@ -79,6 +82,8 @@ export type AssistantSearched = {
   rules: number;
   versions: number;
   references: number;
+  /** 范本教材的模块数。 */
+  exemplars: number;
   /** 本次实际用的关键词。 */
   keywords: string[];
 };

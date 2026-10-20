@@ -79,6 +79,20 @@ Preserve → Adapt → Generate
 ~~~text
 AI教材工作台/
   workspace.json                    # 工作区版本、应用配置与本地索引
+  rules/                            # 顶层：跨项目规则（随包基线 + 老师新增）
+    <rule-set-id>/
+      rule.json                     # 规则身份 + 元数据（阶段/执行方式/源行/判据/来源）
+      bindings.json                 # 作用域绑定（global/project/grade/book/module/lesson）
+      versions/<n>.json             # 人类可读指令 + 机器可读约束 + 状态
+  knowledge/                        # 顶层：跨项目知识库（随包基线 + 按批投入）
+    collections/                    # 一次投入的一批资料
+      <collection-id>/
+        manifest.json               # 批次元数据 + 索引（书种/课/模块 → 文件、页范围）
+        ocr/<book>/                 # content.md / structure.json / pages/ / assets/ / original.pdf
+        modules/<bookType>/lesson-NN/<moduleKey>.md
+    grammar/                        # 语法参考（按语法点，含 index.json）
+    review-standards/               # 审校判据（按小节引用）
+    entries.json                    # 工作区级知识条目（预留）
   projects/
     <project-id>/
       project.json                  # 年级、学期、Lesson 目录、项目设置
@@ -92,15 +106,8 @@ AI教材工作台/
             pages/                  # 整页页图（JPEG 150DPI，可重建）
             assets/                 # 区域裁切资产（表格/插图）
             diagnostics.json        # 失败原因、低置信块、上游日志尾部
-      rules/
-        <rule-set-id>/
-          rule.md
-          versions/
-      references/
-        cambridge/
-        other/
       lessons/
-        lesson-<NN>/                  # 与实现一致：lesson-01、lesson-02…
+        lesson-<NN>/                # 与实现一致：lesson-01、lesson-02…
           lesson.json
           sources.json
           context.json
@@ -114,16 +121,16 @@ AI教材工作台/
             vocab/
           review/
             <review-job-id>/
-              manifest.json        # 输入版本、规则快照、来源和任务状态
-              findings.json        # 审校结构化事实源
-              decisions.json       # 老师对 Finding 的处理决定
-              report.html          # 由结构化结果生成、可重建的静态报告
+              manifest.json         # 输入版本、规则快照、来源和任务状态
+              findings.json         # 审校结构化事实源
+              decisions.json        # 老师对 Finding 的处理决定
+              report.html           # 由结构化结果生成、可重建的静态报告
       exports/
-      .app/
-        index.json                  # 可重建的本地索引，不能成为唯一事实源
-        jobs/
-        retrieval/                  # 可重建的检索索引与页图定位缓存
-        logs/
+  .app/
+    index.json                      # 可重建的本地索引，不能成为唯一事实源
+    jobs/
+    retrieval/                      # 可重建的检索索引与页图定位缓存
+    logs/
 ~~~
 
 正文、规则和说明优先保存为 Markdown / JSON；二进制原件和图片保留原始文件。任何用于加速检索的本地索引都必须可由上述源文件重建，不能形成隐藏数据库。

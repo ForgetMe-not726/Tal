@@ -22,6 +22,8 @@ export type PageEvidenceProps = {
   label: string;
   /** 已确认的 OCR 任务；为空表示这条来源定位不到页图。 */
   jobId: string | null;
+  /** 直接给页图地址（知识库集合用；给了就不用 jobId 拼）。 */
+  src?: string | null;
   /** 0 起的页码；为空表示连页码都没有。 */
   pageIndex: number | null;
   /** 命中区域（百分比）。知识条目目前没有块坐标，通常为空。 */
@@ -29,11 +31,12 @@ export type PageEvidenceProps = {
   className?: string;
 };
 
-export function PageEvidence({ label, jobId, pageIndex, box, className }: PageEvidenceProps) {
+export function PageEvidence({ label, jobId, src, pageIndex, box, className }: PageEvidenceProps) {
   const [open, setOpen] = React.useState(false);
   const [failed, setFailed] = React.useState(false);
 
-  const locatable = Boolean(jobId) && pageIndex !== null;
+  const imageSrc = src ?? (jobId && pageIndex !== null ? `/api/ocr/${jobId}/raw/pages/${pageImageName(pageIndex)}` : null);
+  const locatable = Boolean(imageSrc);
   const pageText = pageIndex === null ? "未记录页码" : `第 ${pageIndex + 1} 页`;
 
   return (
@@ -98,7 +101,7 @@ export function PageEvidence({ label, jobId, pageIndex, box, className }: PageEv
                   <div className="relative mx-auto w-full max-w-[620px] rounded-[2px] bg-sheet shadow-paper">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={`/api/ocr/${jobId}/raw/pages/${pageImageName(pageIndex!)}`}
+                      src={imageSrc!}
                       alt={`${label} 第 ${pageIndex! + 1} 页原图`}
                       className="block w-full rounded-[2px]"
                       onError={() => setFailed(true)}

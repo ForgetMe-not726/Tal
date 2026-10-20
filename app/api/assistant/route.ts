@@ -8,7 +8,7 @@ import { aiConfigured } from "@/lib/ai/gateway";
 export const runtime = "nodejs";
 
 const SCOPES: readonly AssistantScope[] = ["workspace", "project"];
-const SOURCE_KINDS: readonly AssistantSourceKind[] = ["source", "rule", "version", "reference"];
+const SOURCE_KINDS: readonly AssistantSourceKind[] = ["source", "rule", "version", "reference", "exemplar"];
 
 function normalize(body: Record<string, unknown>): AssistantQuery {
   const query = typeof body.query === "string" ? body.query.trim() : "";
