@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { FileStore, FileStoreError } from "../lib/db/file-store.ts";
 import { loadRelatedVersions } from "../lib/knowledge/related-content.ts";
+import { workspaceProject } from "../lib/workspace/default-project.ts";
 import { ensureWorkspace } from "../lib/workspace/bootstrap.ts";
 import { readJson, writeJson } from "../lib/workspace/json.ts";
 
@@ -478,6 +479,33 @@ async function testRelatedContentLoader() {
   });
 }
 
+/**
+ * 工作区默认项目：老师不需要选项目。
+ *
+ * 空工作区自动建一个；**已有历史项目就沿用它**（绝不因为"没选项目"另起一个，
+ * 否则历史来源与版本会散在两个项目里）。
+ */
+async function testWorkspaceProjectIsImplicit() {
+  // 1) 空工作区：自动建一个
+  await withWorkspace(async () => {
+    const first = await workspaceProject();
+    assert.equal(first.name, "我的教材");
+    assert.equal(first.grade, "L5");
+    const again = await workspaceProject();
+    assert.equal(again.id, first.id, "再取一次是同一个，不重复创建");
+    assert.equal((await store().listProjects()).length, 1);
+  });
+
+  // 2) 已有历史项目：沿用它，不新建
+  await withWorkspace(async () => {
+    const s = store();
+    const historical = await s.insertProject({ name: "冬季教材迁移", grade: "L5", term: "winter" });
+    const picked = await workspaceProject();
+    assert.equal(picked.id, historical.id, "历史项目优先");
+    assert.equal((await s.listProjects()).length, 1, "不能另起一个项目");
+  });
+}
+
 const tests = [
   ["工作区初始化建出完整目录树", testBootstrapCreatesTree],
   ["初始化幂等且不覆盖老师内容", testBootstrapIsIdempotentAndNonDestructive],
@@ -493,6 +521,7 @@ const tests = [
   ["并发写不丢数据", testConcurrentWritesDoNotLoseData],
   ["危险目录名被安全化", testUnsafeSegmentsAreSanitized],
   ["跨书上下文只取已确认且排除自己", testRelatedContentLoader],
+  ["默认项目隐式存在且沿用历史项目", testWorkspaceProjectIsImplicit],
 ];
 
 for (const [name, test] of tests) {
