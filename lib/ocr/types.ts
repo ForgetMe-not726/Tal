@@ -122,6 +122,8 @@ export type OcrJobRecord = {
   /** 已处理页数 / 总页数；拿不到就为 null，**不编造百分比**。 */
   pagesDone?: number | null;
   pagesTotal?: number | null;
+  /** 页数的来源：`pdf` = 直接读 PDF 得到的真实页数（旧记录没有这个标记）。 */
+  pagesSource?: "pdf";
   /** 阶段说明（给老师看的一句话）。 */
   stage: string;
   message?: string;

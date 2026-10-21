@@ -244,7 +244,8 @@ export default function WorkbenchPage() {
     // 改用下面的派生值把它挡住。
     if (!projectId) return;
     let active = true;
-    void fetch(`/api/ocr/sources?projectId=${encodeURIComponent(projectId)}&bookType=${bookType}`, {
+    // 来源按整个工作区列：老师不需要按项目切换
+    void fetch(`/api/ocr/sources?bookType=${bookType}`, {
       cache: "no-store",
     })
       .then(async (response) => {
@@ -806,9 +807,6 @@ export default function WorkbenchPage() {
         blocks={blocks}
         loadingModule={loadingModule}
         failures={moduleFailures}
-        projects={projects}
-        projectId={projectId}
-        onProjectChange={setProjectId}
         ocrSources={visibleOcrSources}
         onSelectOcrSource={(jobId) => void handleSelectOcrSource(jobId)}
         onOutlineFileChange={(file) => void handleOutlineFileChange(file)}

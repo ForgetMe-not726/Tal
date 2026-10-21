@@ -46,9 +46,6 @@ interface Props {
   /** 模块 id → 生成失败原因，就地显示，避免只有一闪而过的提示。 */
   failures?: Record<string, string>;
   /** 本地项目（此前项目名写死在页面常量里，两边对不上就选不到刚识别完的来源）。 */
-  projects: Array<{ id: string; name: string; grade: string; term: string }>;
-  projectId: string;
-  onProjectChange: (projectId: string) => void;
   /** 已确认的 OCR 来源（资料识别页确认过的），可直接选用。 */
   ocrSources: Array<{ jobId: string; originalName: string; pageCount: number }>;
   onSelectOcrSource: (jobId: string) => void;
@@ -79,9 +76,6 @@ export function WorkbenchLeftPanel({
   blocks,
   loadingModule,
   failures = {},
-  projects,
-  projectId,
-  onProjectChange,
   ocrSources,
   onSelectOcrSource,
   onOutlineFileChange,
@@ -115,29 +109,6 @@ export function WorkbenchLeftPanel({
       </div>
 
       <div className="flex flex-col gap-2.5 px-3 py-3">
-        {/* 项目：与「资料识别」页共用同一套项目，来源和版本才落在一起 */}
-        <section className="space-y-1.5 rounded-md border border-line bg-canvas/40 p-2.5">
-          <label htmlFor="project" className="block text-xs font-medium text-ink-2">本地项目</label>
-          <select
-            id="project"
-            value={projectId}
-            onChange={(event) => onProjectChange(event.target.value)}
-            className="h-8 w-full rounded-md border border-line bg-paper px-2 text-xs text-ink outline-none focus:border-brand"
-          >
-            <option value="">选择项目…</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.name} · {project.grade} · {project.term}
-              </option>
-            ))}
-          </select>
-          {!projectId && (
-            <p className="text-[10px] leading-relaxed text-ink-3">
-              还没有项目，去「资料识别」新建一个。
-            </p>
-          )}
-        </section>
-
         <section className="space-y-1.5 rounded-md border border-line bg-canvas/40 p-2.5">
           <label htmlFor="outlineFile" className="block text-xs font-medium text-ink-2">部门大纲</label>
           <input

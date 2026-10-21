@@ -8,13 +8,7 @@ import type { OcrJobView } from "@/lib/ocr/jobs";
 import type { OcrJobStatus } from "@/lib/ocr/types";
 import { cn } from "@/lib/utils";
 
-export type ProjectOption = { id: string; name: string; grade: string; term: string };
-
 export type RecognizeLeftPanelProps = {
-  projects: ProjectOption[];
-  projectId: string;
-  onProjectChange: (projectId: string) => void;
-  onCreateProject: (input: { name: string; grade: string; term: string }) => void;
   bookType: BookTypeId;
   onBookTypeChange: (bookType: BookTypeId) => void;
   jobs: OcrJobView[];
@@ -60,10 +54,6 @@ export function jobStatusOf(job: OcrJobView): OcrJobStatus {
 }
 
 export function RecognizeLeftPanel({
-  projects,
-  projectId,
-  onProjectChange,
-  onCreateProject,
   bookType,
   onBookTypeChange,
   jobs,
@@ -79,7 +69,6 @@ export function RecognizeLeftPanel({
   onSelectPage,
   jobId,
 }: RecognizeLeftPanelProps) {
-  const [newProject, setNewProject] = React.useState("");
   const [upstreamDir, setUpstreamDir] = React.useState("");
 
   return (
@@ -92,51 +81,6 @@ export function RecognizeLeftPanel({
       </div>
 
       <div className="flex flex-col gap-2.5 px-3 py-3">
-        {/* 项目：识别产物落在 projects/<id>/sources/，制作页要落到同一个项目 */}
-        <section className="space-y-1.5 rounded-md border border-line bg-canvas/40 p-2.5">
-          <label htmlFor="project" className="block text-xs font-medium text-ink-2">
-            本地项目
-          </label>
-          {projects.length > 0 ? (
-            <select
-              id="project"
-              value={projectId}
-              onChange={(event) => onProjectChange(event.target.value)}
-              className="h-8 w-full rounded-md border border-line bg-paper px-2 text-xs text-ink outline-none focus:border-brand"
-            >
-              <option value="">选择项目…</option>
-              {projects.map((project) => (
-                <option key={project.id} value={project.id}>
-                  {project.name} · {project.grade} · {project.term}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <p className="text-[10px] text-ink-3">还没有项目，先新建一个。</p>
-          )}
-          <div className="flex gap-1.5">
-            <input
-              value={newProject}
-              onChange={(event) => setNewProject(event.target.value)}
-              placeholder="新建项目名"
-              className="h-7 min-w-0 flex-1 rounded border border-line bg-paper px-2 text-[10px] text-ink outline-none placeholder:text-ink-3 focus:border-brand"
-            />
-            <button
-              type="button"
-              disabled={!newProject.trim()}
-              onClick={() => {
-                const name = newProject.trim();
-                if (!name) return;
-                onCreateProject({ name, grade: "L5", term: "winter" });
-                setNewProject("");
-              }}
-              className="rounded border border-line px-2 text-[10px] text-ink-2 transition-colors hover:border-brand/40 hover:text-brand-deep disabled:opacity-50"
-            >
-              新建
-            </button>
-          </div>
-        </section>
-
         {/* 书种决定用哪个解析器切课，导入时就要定 */}
         <section className="space-y-1.5 rounded-md border border-line bg-canvas/40 p-2.5">
           <label htmlFor="bookType" className="block text-xs font-medium text-ink-2">
@@ -166,7 +110,7 @@ export function RecognizeLeftPanel({
             className={cn(
               "flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-dashed border-line bg-paper px-2 py-2 text-[11px] text-ink-2 transition-colors",
               "hover:border-brand/50 hover:text-brand-deep",
-              (!projectId || uploading) && "pointer-events-none opacity-60",
+              uploading && "pointer-events-none opacity-60",
             )}
           >
             {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
@@ -194,7 +138,7 @@ export function RecognizeLeftPanel({
               />
               <button
                 type="button"
-                disabled={!projectId || !upstreamDir.trim()}
+                disabled={!upstreamDir.trim()}
                 onClick={() => {
                   onImportUpstream(upstreamDir.trim(), "");
                   setUpstreamDir("");

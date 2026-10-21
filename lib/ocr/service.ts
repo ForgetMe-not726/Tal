@@ -34,6 +34,7 @@ import {
   cancelProcessTree,
   type MineruHandle,
 } from "./mineru.ts";
+import { countPdfPages } from "./pages.ts";
 import type { ContentListBlock } from "../knowledge/ocr-pages.ts";
 import type { MiddleFile } from "./normalize.ts";
 import { OcrError, type OcrJobRecord } from "./types.ts";
@@ -125,23 +126,29 @@ export async function startRecognition(input: {
 
   inBackground(job.id, async () => {
     const outDir = await mkdtemp(join(tmpdir(), `ocr-${job.id.slice(0, 8)}-`));
+    // 页数以 PDF 为准：上游日志的进度条里混着区域数，不能当页数用
+    const pageCount = await countPdfPages(input.originalPath, mineruPython());
+    if (pageCount != null) {
+      await patchJob(job.id, { pagesTotal: pageCount, pagesDone: 0 }).catch(() => undefined);
+    }
     let lastProgress = "";
     const handle = spawnMineru({
       pdfPath: input.originalPath,
       outDir,
       options: DEFAULT_MINERU_OPTIONS,
+      expectedPages: pageCount,
       onProgress: (progress) => {
         const key = `${progress.done}/${progress.total}`;
         if (key === lastProgress) return;
         lastProgress = key;
         // 进度写入失败不该打断识别本身
+        const total = pageCount ?? progress.total;
+        const done = progress.done == null ? null : Math.min(progress.done, total);
         void patchJob(job.id, {
-          ...(progress.done != null ? { pagesDone: progress.done } : {}),
-          pagesTotal: progress.total,
+          ...(done != null ? { pagesDone: done } : {}),
+          pagesTotal: total,
           stage:
-            progress.done != null
-              ? `识别中 ${progress.done}/${progress.total} 页`
-              : `识别中（共 ${progress.total} 页）`,
+            done != null ? `识别中 ${done}/${total} 页` : `识别中（共 ${total} 页）`,
         }).catch(() => undefined);
       },
     });

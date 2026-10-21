@@ -151,17 +151,23 @@ async function isDirectory(path: string): Promise<boolean> {
 }
 
 /** 进度行的解析（纯函数）。拿不到就返回 null——**不编造百分比**。 */
-export function parseProgress(line: string): { done: number | null; total: number } | null {
-  // 实测三种形态（都打在 stderr）：
-  //   1) tqdm 进度条：`Layout Predict:  31%|███ | 16/52 [00:12<00:29, 1.24it/s]` ← 逐页进度，最有价值
-  //   2) 批次完成：  `Completed batch 1/1 | Processed 52/52 pages | …`
-  //   3) 提交批次：  `Submitting batch 1/1 | … | 52 pages total | …`
-  // 只有总数时也要认——界面先能显示"共 N 页"，而不是一直空着。
-  const bar = /(\d+)\/(\d+)\s*\[/.exec(line);
-  if (bar) {
-    const done = Number(bar[1]);
-    const total = Number(bar[2]);
+export function parseProgress(
+  line: string,
+  expectedTotal?: number | null,
+): { done: number | null; total: number } | null {
+  // MinerU 的 tqdm 进度条里，**只有页级阶段**的分子分母是页数：
+  //   `Layout Predict: 31%|███| 16/52 [00:12<00:29]`      ← 页
+  //   `Processing pages: 100%|███| 65/65 [00:02<00:00]`   ← 页
+  // 其余是**区域/批次**，不能当页数：
+  //   `OCR-rec Predict: 89%|███| 852/954`                 ← 文字区域
+  //   `OCR-det ch: 71%|███| 12/17`                        ← 检测批次
+  // 实测一本 83 页的书因此显示成 "1314/1668 页"。
+  const pageBar = /^\s*(?:Layout Predict|Processing pages)\s*:.*?(\d+)\/(\d+)\s*\[/i.exec(line);
+  if (pageBar) {
+    const done = Number(pageBar[1]);
+    const total = Number(pageBar[2]);
     if (Number.isFinite(done) && Number.isFinite(total) && total > 0 && done <= total) {
+      if (expectedTotal != null && total !== expectedTotal) return null;
       return { done, total };
     }
   }
@@ -170,13 +176,17 @@ export function parseProgress(line: string): { done: number | null; total: numbe
     const done = Number(processed[1]);
     const total = Number(processed[2]);
     if (Number.isFinite(done) && Number.isFinite(total) && total > 0) {
+      if (expectedTotal != null && total !== expectedTotal) return null;
       return { done: Math.min(done, total), total };
     }
   }
   const totalOnly = /(\d+)\s+pages total/i.exec(line);
   if (totalOnly) {
     const total = Number(totalOnly[1]);
-    if (Number.isFinite(total) && total > 0) return { done: null, total };
+    if (Number.isFinite(total) && total > 0) {
+      if (expectedTotal != null && total !== expectedTotal) return null;
+      return { done: null, total };
+    }
   }
   return null;
 }
@@ -205,6 +215,8 @@ export function spawnMineru(input: {
   pdfPath: string;
   outDir: string;
   options?: MineruRunOptions;
+  /** PDF 的真实页数；给了就只认分母与它一致的进度（过滤掉区域数）。 */
+  expectedPages?: number | null;
   onProgress?: (progress: { done: number | null; total: number }) => void;
 }): MineruHandle {
   const executable = mineruExecutable();
@@ -227,7 +239,7 @@ export function spawnMineru(input: {
       if (duplicate >= 0) logTail.splice(duplicate, 1);
       logTail.push(trimmed);
       if (logTail.length > LOG_TAIL_LINES) logTail.shift();
-      const progress = parseProgress(trimmed);
+      const progress = parseProgress(trimmed, input.expectedPages);
       if (progress) input.onProgress?.(progress);
     }
   };

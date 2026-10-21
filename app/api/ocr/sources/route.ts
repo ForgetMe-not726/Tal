@@ -12,8 +12,8 @@ export const runtime = "nodejs";
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
-    const projectId = url.searchParams.get("projectId")?.trim();
-    if (!projectId) throw new OcrError("缺少项目");
+    // 不给 projectId 就列整个工作区的已确认来源：老师不需要按项目切换
+    const projectId = url.searchParams.get("projectId")?.trim() || undefined;
     const bookType = url.searchParams.get("bookType")?.trim() || undefined;
     const sources = await listConfirmedSources({ projectId, bookType: bookType as never });
     return NextResponse.json({ sources });

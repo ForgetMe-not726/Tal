@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { RecognizeContent } from "@/components/recognize/RecognizeContent";
-import { RecognizeLeftPanel, jobStatusOf, type ProjectOption } from "@/components/recognize/RecognizeLeftPanel";
+import { RecognizeLeftPanel, jobStatusOf } from "@/components/recognize/RecognizeLeftPanel";
 import { RecognizePreview } from "@/components/recognize/RecognizePreview";
 import { splitLegacyMarkdown } from "@/lib/knowledge/legacy-source";
 import type { LegacyLessonPackage } from "@/lib/knowledge/legacy-markdown";
@@ -23,8 +23,6 @@ type JobDetail = { job: OcrJobView };
 const POLL_MS = 3000;
 
 export default function RecognizePage() {
-  const [projects, setProjects] = React.useState<ProjectOption[]>([]);
-  const [projectId, setProjectId] = React.useState("");
   const [bookType, setBookType] = React.useState<BookTypeId>("knowledge");
   const [jobs, setJobs] = React.useState<OcrJobView[]>([]);
   const [engine, setEngine] = React.useState<{ ready: boolean; reason?: string }>({ ready: false });
@@ -66,29 +64,10 @@ export default function RecognizePage() {
     return () => clearTimeout(timer);
   }, [toast]);
 
-  // 项目列表
-  React.useEffect(() => {
-    let active = true;
-    void fetch("/api/projects", { cache: "no-store" })
-      .then(async (response) => {
-        const data = (await response.json()) as { projects?: ProjectOption[]; error?: string };
-        if (!response.ok) throw new Error(data.error ?? "项目列表加载失败");
-        if (!active) return;
-        const list = data.projects ?? [];
-        setProjects(list);
-        setProjectId((current) => current || list[0]?.id || "");
-      })
-      .catch((error: unknown) => active && setToast((error as Error).message));
-    return () => {
-      active = false;
-    };
-  }, []);
-
   const loadJobs = React.useCallback(
-    async (targetProject: string, epoch: number) => {
-      const response = await fetch(`/api/ocr?projectId=${encodeURIComponent(targetProject)}`, {
-        cache: "no-store",
-      });
+    async (epoch: number) => {
+      // 不再按项目过滤：整个工作区只有一个任务列表
+      const response = await fetch("/api/ocr", { cache: "no-store" });
       const data = (await response.json()) as {
         jobs?: OcrJobView[];
         engine?: { ready: boolean; reason?: string };
@@ -102,26 +81,25 @@ export default function RecognizePage() {
     [],
   );
 
-  // 任务列表：切换项目时重载，并在有任务在跑时轮询
+  // 任务列表：进页面加载一次，并在有任务在跑时轮询
   React.useEffect(() => {
-    if (!projectId) return;
     const epoch = requestEpoch.current;
-    void loadJobs(projectId, epoch).catch((error: unknown) =>
+    void loadJobs(epoch).catch((error: unknown) =>
       setToast((error as Error).message),
     );
-  }, [projectId, loadJobs]);
+  }, [loadJobs]);
 
   const anyRunning = jobs.some((job) =>
     ["queued", "running", "normalizing"].includes(job.status),
   );
   React.useEffect(() => {
-    if (!projectId || !anyRunning) return;
+    if (!anyRunning) return;
     const epoch = requestEpoch.current;
     const timer = setInterval(() => {
-      void loadJobs(projectId, epoch).catch(() => undefined);
+      void loadJobs(epoch).catch(() => undefined);
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [projectId, anyRunning, loadJobs]);
+  }, [anyRunning, loadJobs]);
 
   /** 选中任务：拉状态 + 结构 + 正文。 */
   const loadDetail = React.useCallback(
@@ -172,36 +150,11 @@ export default function RecognizePage() {
     return () => clearInterval(timer);
   }, [selectedJobId, anyRunning, loadDetail]);
 
-  async function handleCreateProject(input: { name: string; grade: string; term: string }) {
-    try {
-      const response = await fetch("/api/projects", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(input),
-      });
-      const data = (await response.json()) as { project?: ProjectOption; error?: string };
-      if (!response.ok) throw new Error(data.error ?? "新建项目失败");
-      setProjects((previous) => [data.project!, ...previous.filter((item) => item.id !== data.project!.id)]);
-      setProjectId(data.project!.id);
-      setToast(`已新建项目「${data.project!.name}」`);
-    } catch (error) {
-      setToast((error as Error).message);
-    }
-  }
-
   /** 上传原件：**流式**发送，不走 multipart（教材 PDF 实测 209 MB）。 */
   async function handleUploadFile(file: File) {
-    if (!projectId) {
-      setToast("请先选择或新建项目");
-      return;
-    }
     setUploading(true);
     try {
-      const query = new URLSearchParams({
-        projectId,
-        bookType,
-        fileName: file.name,
-      });
+      const query = new URLSearchParams({ bookType, fileName: file.name });
       const response = await fetch(`/api/ocr?${query.toString()}`, {
         method: "POST",
         headers: { "content-type": "application/octet-stream" },
@@ -211,7 +164,7 @@ export default function RecognizePage() {
       if (!response.ok) throw new Error(data.error ?? "导入失败");
       setToast(`已开始识别「${file.name}」`);
       setSelectedJobId(data.job!.id);
-      await loadJobs(projectId, requestEpoch.current);
+      await loadJobs(requestEpoch.current);
     } catch (error) {
       setToast((error as Error).message);
     } finally {
@@ -220,21 +173,17 @@ export default function RecognizePage() {
   }
 
   async function handleImportUpstream(upstreamDir: string) {
-    if (!projectId) {
-      setToast("请先选择或新建项目");
-      return;
-    }
     try {
       const response = await fetch("/api/ocr", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ projectId, bookType, upstreamDir }),
+        body: JSON.stringify({ bookType, upstreamDir }),
       });
       const data = (await response.json()) as { job?: OcrJobView; error?: string };
       if (!response.ok) throw new Error(data.error ?? "导入失败");
       setToast("已导入已有产物，正在整理");
       setSelectedJobId(data.job!.id);
-      await loadJobs(projectId, requestEpoch.current);
+      await loadJobs(requestEpoch.current);
     } catch (error) {
       setToast((error as Error).message);
     }
@@ -268,7 +217,7 @@ export default function RecognizePage() {
       const data = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "确认失败");
       setToast("已确认并加入资料库");
-      await loadJobs(projectId, requestEpoch.current);
+      await loadJobs(requestEpoch.current);
       await loadDetail(selectedJobId, requestEpoch.current);
     } catch (error) {
       setToast((error as Error).message);
@@ -288,7 +237,7 @@ export default function RecognizePage() {
       const data = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(data.error ?? "重新识别失败");
       setToast("已重新开始识别");
-      await loadJobs(projectId, requestEpoch.current);
+      await loadJobs(requestEpoch.current);
     } catch (error) {
       setToast((error as Error).message);
     }
@@ -300,19 +249,6 @@ export default function RecognizePage() {
   return (
     <div className="flex h-screen min-w-0 flex-1">
       <RecognizeLeftPanel
-        projects={projects}
-        projectId={projectId}
-        onProjectChange={(next) => {
-          requestEpoch.current += 1;
-          loadedJobId.current = null;
-          setProjectId(next);
-          setSelectedJobId(null);
-          setDetail(null);
-          setStructure(null);
-          setMarkdown("");
-          setSavedMarkdown("");
-        }}
-        onCreateProject={(input) => void handleCreateProject(input)}
         bookType={bookType}
         onBookTypeChange={setBookType}
         jobs={jobs}

@@ -72,7 +72,7 @@
 | 模块 | 状态 | 复核方式 |
 | --- | --- | --- |
 | 本地基座（Local-0） | 文件工作区已完成；**桌面壳未做**（决定：先在原型里做完功能再统一迁 Tauri） | `npm run test:store`；干净工作区跑主流程后重启进程，确认数据仍在 |
-| 资料识别（Local-1） | **2026-09-29 完成**：`lib/ocr/*` + `/api/ocr/*` + `/recognize` 页；导入 → 本机 OCR → 原页/结构预览 → 修订与切分核对 → 确认入库 → 制作页可选用 | `npm run test:ocr-normalize`、`npm run test:ocr-jobs`；真实样张：导入已有产物（学生用书 131 页）、真实 spawn（知识清单 52 页 / 249 s）、取消（杀进程树）、209 MB 流式上传 |
+| 资料识别（Local-1） | **2026-10-21 修正**：去掉"本地项目"UI（单机单人工具，整个工作区一个资料库；API 的 projectId 变为可选，缺省用工作区默认项目）；任务页数改为**直接读 PDF 真实页数**，进度只认页级阶段（此前把 MinerU 的区域数当页数，83 页的书显示成 1668 页）。原有条目见下 | **2026-09-29 完成**：`lib/ocr/*` + `/api/ocr/*` + `/recognize` 页；导入 → 本机 OCR → 原页/结构预览 → 修订与切分核对 → 确认入库 → 制作页可选用 | `npm run test:ocr-normalize`、`npm run test:ocr-jobs`；真实样张：导入已有产物（学生用书 131 页）、真实 spawn（知识清单 52 页 / 249 s）、取消（杀进程树）、209 MB 流式上传 |
 | 教材制作（Local-2） | 三书迁移闭环可用 | `npm test` 全量；真实教材端到端生成 + DOCX 导出 |
 | 教材审校（Local-3 后半） | **2026-10-08 机器已落地**：`/review` 页面、八段 Pipeline、`manifest/findings/decisions/report.html` 契约、人工决定与固定模板报告；范围支持「单模块 / 整本书」。**2026-10-09 接入公司审校标准**：`pet-material-review` v1.0.0 的 24 条规则进随包基线，判据材料按 `standard_refs` 定向取用，执行方式分流（`human_visual` 如实标注为需人工目视核对），三态结果的「无法核查」结构化记入 Finding，规则集身份进 manifest | `npm run test:review-pipeline`、`npm run test:review-report`、`npm run test:review-jobs`、`npm run test:review-skill`；真实样张：对 Lesson 1 学生用书 `lets_say` v2 跑一次审校 → 生效 28 条（24 条标准规则 + 4 条本项目审校规则）、取用 38 个判据小节、10 条 Finding（含 4 条待目视、多条缺证）→ 采用/忽略 → 生成并查看报告 |
 | 单词小超市（Local-3 前半） | 只有枚举占位：模块目录 0 条，选中即报错 | — |

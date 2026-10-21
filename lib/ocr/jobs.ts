@@ -14,7 +14,8 @@ import { join } from "node:path";
 import { copyDirFiles, copyIntoWorkspace, readBinary, writeBinaryAtomic } from "../workspace/files.ts";
 import { listDir, readJson, readJsonDir, updateJson, writeJson } from "../workspace/json.ts";
 import { jobFile, jobsDir, ocrDir, ocrJobDir, originalsDir, safeSegment } from "../workspace/paths.ts";
-import { isProcessAlive } from "./mineru.ts";
+import { isProcessAlive, mineruPython } from "./mineru.ts";
+import { countPdfPages } from "./pages.ts";
 import {
   buildContentMarkdown,
   buildStructure,
@@ -28,7 +29,6 @@ import {
   renderPageImages,
   type PageImageOptions,
 } from "./pages.ts";
-import { mineruPython } from "./mineru.ts";
 import {
   OcrError,
   type OcrJobRecord,
@@ -126,7 +126,7 @@ export async function listJobs(filter: { projectId?: string } = {}): Promise<Ocr
   const records = await readJsonDir<OcrJobRecord>(jobsDir());
   const alive = new Map<string, boolean>();
   const repaired: OcrJobRecord[] = [];
-  for (const record of records) {
+  for (let record of records) {
     if (!record || !record.id) continue;
     if (record.status === "running" || record.status === "queued" || record.status === "normalizing") {
       if (!alive.has(record.id)) alive.set(record.id, isProcessAlive(record.pid));
@@ -140,6 +140,35 @@ export async function listJobs(filter: { projectId?: string } = {}): Promise<Ocr
         });
         repaired.push(updated);
         continue;
+      }
+    }
+    // 中断任务的 stage 可能还停在旧进度字符串上；进度另有字段，这里改回状态词
+    if (record.status === "interrupted" && record.stage?.startsWith("识别中")) {
+      record = await patchJob(record.id, { stage: "已中断" });
+    }
+    // 旧记录里的页数来自上游日志（混着区域数，实测 83 页写成 1668 页）。
+    // 终态任务做一次校正并打上来源标记，之后不再重复开 PDF。
+    if (
+      record.pagesTotal != null &&
+      record.pagesSource !== "pdf" &&
+      record.originalPath &&
+      record.status !== "running" &&
+      record.status !== "queued" &&
+      record.status !== "normalizing"
+    ) {
+      const real = await countPdfPages(record.originalPath, mineruPython());
+      if (real != null) {
+        record =
+          real === record.pagesTotal
+            ? await patchJob(record.id, { pagesSource: "pdf" })
+            : await patchJob(record.id, {
+                pagesTotal: real,
+                pagesDone:
+                  record.pagesDone == null ? record.pagesDone : Math.min(record.pagesDone, real),
+                pagesSource: "pdf",
+                // 中断任务的 stage 还停在旧进度字符串上；进度另有字段，这里改回状态词
+                ...(record.status === "interrupted" ? { stage: "已中断" } : {}),
+              });
       }
     }
     repaired.push(record);
@@ -357,26 +386,31 @@ export function effectiveStatus(view: OcrJobView): OcrJobStatus {
 
 /** 已确认的来源清单（制作页下拉用）。扫目录，不维护第二份索引。 */
 export async function listConfirmedSources(filter: {
-  projectId: string;
+  /** 不给就列整个工作区——老师不需要按项目切换。 */
+  projectId?: string;
   bookType?: BookType;
 }): Promise<OcrSourceSummary[]> {
-  const names = await listDir(ocrDir(filter.projectId));
+  const projectIds = filter.projectId
+    ? [filter.projectId]
+    : (await (await import("../db/store.ts")).getAppStore().listProjects()).map((project) => project.id);
   const summaries: OcrSourceSummary[] = [];
-  for (const name of names) {
-    const manifest = await readJson<OcrManifest | null>(
-      join(ocrJobDir(filter.projectId, name), "manifest.json"),
-      null,
-    );
-    if (!manifest || manifest.status !== "confirmed") continue;
-    if (filter.bookType && manifest.bookType !== filter.bookType) continue;
-    summaries.push({
-      jobId: manifest.jobId,
-      projectId: manifest.projectId,
-      bookType: manifest.bookType,
-      originalName: manifest.originalName,
-      pageCount: manifest.pageCount,
-      confirmedAt: manifest.confirmedAt ?? manifest.updatedAt,
-    });
+  for (const projectId of projectIds) {
+    for (const name of await listDir(ocrDir(projectId))) {
+      const manifest = await readJson<OcrManifest | null>(
+        join(ocrJobDir(projectId, name), "manifest.json"),
+        null,
+      );
+      if (!manifest || manifest.status !== "confirmed") continue;
+      if (filter.bookType && manifest.bookType !== filter.bookType) continue;
+      summaries.push({
+        jobId: manifest.jobId,
+        projectId: manifest.projectId,
+        bookType: manifest.bookType,
+        originalName: manifest.originalName,
+        pageCount: manifest.pageCount,
+        confirmedAt: manifest.confirmedAt ?? manifest.updatedAt,
+      });
+    }
   }
   return summaries.sort((a, b) => b.confirmedAt.localeCompare(a.confirmedAt));
 }

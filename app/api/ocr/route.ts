@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { join } from "node:path";
 import { readHead, saveStreamToWorkspace } from "@/lib/workspace/files";
 import { originalsDir } from "@/lib/workspace/paths";
-import { getAppStore } from "@/lib/db/store";
+import { workspaceProject } from "@/lib/workspace/default-project";
 import {
   MAX_ORIGINAL_BYTES,
   assertBookType,
@@ -32,8 +32,8 @@ export async function POST(request: Request) {
 
     if (contentType.includes("application/json")) {
       const body = (await request.json()) as Record<string, unknown>;
-      const projectId = String(body.projectId ?? "").trim();
-      if (!projectId) throw new OcrError("缺少项目");
+      // 老师不需要选项目：不给就用工作区默认项目
+      const projectId = String(body.projectId ?? "").trim() || (await workspaceProject()).id;
       const job = await startImport({
         projectId,
         bookType: assertBookType(body.bookType),
@@ -46,10 +46,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ job }, { status: 201 });
     }
 
-    const projectId = String(url.searchParams.get("projectId") ?? "").trim();
-    if (!projectId) throw new OcrError("缺少项目");
-    const project = await getAppStore().getProjectById(projectId);
-    if (!project) throw new OcrError("项目不存在");
+    const project = await workspaceProject();
+    const projectId = project.id;
     const bookType = assertBookType(url.searchParams.get("bookType"));
     const originalName = assertImportable(url.searchParams.get("fileName") ?? "");
     if (!request.body) throw new OcrError("请求体为空，没有收到文件");

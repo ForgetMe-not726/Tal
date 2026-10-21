@@ -292,6 +292,16 @@ function testProgressParsing() {
   // 越界/异常值不算进度
   assert.equal(parseProgress("batch 3/2 [x]"), null);
   assert.equal(parseProgress("Processed 5/0 pages"), null);
+
+  // **区域数不是页数**（实测一本 83 页的书因此显示成 1314/1668 页）
+  assert.equal(parseProgress("OCR-rec Predict:  89%|███ | 852/954 [00:25<00:06, 16.26it/s]"), null);
+  assert.equal(parseProgress("OCR-det ch:  71%|███ | 588/692 [01:23<00:19,  5.12it/s]"), null);
+  assert.equal(parseProgress("Seal Predict: 100%|███ | 83/83 [00:02<00:00]"), null);
+
+  // 给了 PDF 真实页数：分母对不上的一律不算（哪怕它长得像页级阶段）
+  assert.deepEqual(parseProgress("Layout Predict:  31%|███ | 16/52 [00:12]", 83), null);
+  assert.deepEqual(parseProgress("Processing pages:  50%|███ | 41/83 [00:02]", 83), { done: 41, total: 83 });
+  assert.deepEqual(parseProgress("Completed batch 1/1 | Processed 83/83 pages", 83), { done: 83, total: 83 });
 }
 
 const tests = [

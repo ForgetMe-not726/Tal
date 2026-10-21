@@ -59,6 +59,34 @@ export function renderPagesCommand(input: {
 
 export type RenderResult = { pageCount: number; stdout: string; stderr: string };
 
+/**
+ * 读 PDF 的**真实页数**（pypdfium2）。
+ *
+ * 为什么不从 MinerU 的日志里取：它的 tqdm 进度条混着**区域数**（`OCR-rec Predict: 852/954`
+ * 是文字区域、`OCR-det: 12/17` 是检测批次），当页数显示会得到离谱的数字
+ * （实测一本 83 页的书显示成 1314/1668 页）。页数只有 PDF 自己说了算。
+ */
+export async function countPdfPages(pdfPath: string, pythonExe: string): Promise<number | null> {
+  const script = [
+    "import sys",
+    "import pypdfium2 as pdfium",
+    "doc = pdfium.PdfDocument(sys.argv[1])",
+    "print(len(doc))",
+  ].join("\n");
+  return new Promise((resolvePromise) => {
+    const child = spawn(pythonExe, ["-I", "-c", script, pdfPath], { windowsHide: true });
+    let stdout = "";
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString("utf8");
+    });
+    child.on("error", () => resolvePromise(null));
+    child.on("close", (code) => {
+      const value = Number(stdout.trim());
+      resolvePromise(code === 0 && Number.isInteger(value) && value > 0 ? value : null);
+    });
+  });
+}
+
 /** 跑一次页图渲染。失败抛错，错误里带 stderr 尾部（可诊断）。 */
 export async function renderPageImages(input: {
   pythonExe: string;
