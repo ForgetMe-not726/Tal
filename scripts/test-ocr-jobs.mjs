@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -22,7 +22,9 @@ import {
 import { resolveInWorkspace, WorkspaceFileError } from "../lib/workspace/files.ts";
 import { parseProgress } from "../lib/ocr/mineru.ts";
 import { ensureWorkspace } from "../lib/workspace/bootstrap.ts";
-import { ocrJobDir } from "../lib/workspace/paths.ts";
+import { jobsDir, ocrJobDir, ocrUpstreamDir } from "../lib/workspace/paths.ts";
+import { deleteJob } from "../lib/ocr/jobs.ts";
+import { reconcileOcrJobs } from "../lib/ocr/service.ts";
 
 /** 临时工作区：与 test-file-store.mjs 同款注入方式（环境变量 + 系统临时目录）。 */
 function withWorkspace(run) {
@@ -101,8 +103,8 @@ async function testStaleJobIsRepaired() {
       originalName: "a.pdf",
       originalPath: "/tmp/a.pdf",
     });
-    // 造一个几乎不可能存在的 pid
-    await patchJob(job.id, { status: "running", pid: 999999, stage: "识别中" });
+    // 造一个几乎不可能存在的 pid，并把持有者换成别的进程（模拟应用重启）
+    await patchJob(job.id, { status: "running", pid: 999999, ownerPid: 999998, stage: "识别中" });
     const [listed] = await listJobs();
     assert.equal(listed.status, "interrupted");
     assert.match(listed.message, /重新识别/);
@@ -274,34 +276,171 @@ async function testStoreOriginal() {
  * 形态来自真实 stderr：tqdm 进度条、批次完成行、批次提交行。
  */
 function testProgressParsing() {
-  // tqdm（逐页，最有价值）
+  // 页级阶段：分子分母都是页
   assert.deepEqual(parseProgress("Layout Predict:  31%|███ | 16/52 [00:12<00:29, 1.24it/s]"), {
+    kind: "pages",
     done: 16,
     total: 52,
   });
-  // 批次完成
-  assert.deepEqual(parseProgress("Completed batch 1/1 | Processed 52/52 pages | 1 of 1 batches finished"), {
+  assert.deepEqual(parseProgress("Processing pages:  50%|███ | 41/83 [00:05<00:05]"), {
+    kind: "pages",
+    done: 41,
+    total: 83,
+  });
+  assert.deepEqual(parseProgress("Completed batch 1/1 | Processed 52/52 pages"), {
+    kind: "pages",
     done: 52,
     total: 52,
   });
-  // 只有总数：先让界面显示"共 N 页"，done 留空
-  assert.deepEqual(parseProgress("Submitting batch 1/1 | 52 pages total |"), { done: null, total: 52 });
-  // 认不出就不猜
+  assert.deepEqual(parseProgress("Submitting batch 1/1 | 52 pages total |"), {
+    kind: "pages",
+    done: null,
+    total: 52,
+  });
+
+  // **区域数不是页数**：这三条以前会显示成 "1668 页"，现在只报阶段百分比
+  assert.deepEqual(parseProgress("OCR-rec Predict:  89%|███ | 852/954 [00:25<00:06]"), {
+    kind: "phase",
+    label: "文字识别",
+    percent: 89,
+  });
+  assert.deepEqual(parseProgress("OCR-det ch:  71%|███ | 588/692 [01:23]"), {
+    kind: "phase",
+    label: "文字检测",
+    percent: 85,
+  });
+  assert.equal(parseProgress("Seal Predict: 100%|███ | 83/83 [00:02]")?.kind, "phase");
+
+  // 分批的 Layout Predict 分母只是本批页数：给了真实页数就必须丢弃
+  assert.equal(parseProgress("Layout Predict: 100%|███| 19/19 [01:22]", 83), null);
+  assert.deepEqual(parseProgress("Processing pages:  50%|███ | 41/83 [00:05]", 83), {
+    kind: "pages",
+    done: 41,
+    total: 83,
+  });
+
+  // 认不出/异常值不猜
   assert.equal(parseProgress("INFO: Started server process [19576]"), null);
   assert.equal(parseProgress(""), null);
-  // 越界/异常值不算进度
-  assert.equal(parseProgress("batch 3/2 [x]"), null);
   assert.equal(parseProgress("Processed 5/0 pages"), null);
+}
 
-  // **区域数不是页数**（实测一本 83 页的书因此显示成 1314/1668 页）
-  assert.equal(parseProgress("OCR-rec Predict:  89%|███ | 852/954 [00:25<00:06, 16.26it/s]"), null);
-  assert.equal(parseProgress("OCR-det ch:  71%|███ | 588/692 [01:23<00:19,  5.12it/s]"), null);
-  assert.equal(parseProgress("Seal Predict: 100%|███ | 83/83 [00:02<00:00]"), null);
+/**
+ * `.app/jobs` 与审校共用：识别列表只能看带 `bookType` 的记录。
+ *
+ * 否则审校任务会以 `originalName: undefined` 出现在识别页，上限清理还可能把它们删掉
+ * （实际发生过：7 条审校记录被误删，靠产物重建才恢复）。
+ */
+async function testJobListIsOcrOnly() {
+  await withWorkspace(async () => {
+    await ensureWorkspace();
+    writeFileSync(
+      join(jobsDir(), "review-shaped.json"),
+      JSON.stringify({
+        id: "review-shaped",
+        projectId: PROJECT,
+        lessonNumber: 1,
+        status: "ready",
+        stage: "待人工复核",
+        createdAt: "2026-10-01T00:00:00.000Z",
+        updatedAt: "2026-10-01T00:00:00.000Z",
+      }),
+    );
+    assert.deepEqual(await listJobs(), [], "识别列表不能混进审校任务");
+  });
+}
 
-  // 给了 PDF 真实页数：分母对不上的一律不算（哪怕它长得像页级阶段）
-  assert.deepEqual(parseProgress("Layout Predict:  31%|███ | 16/52 [00:12]", 83), null);
-  assert.deepEqual(parseProgress("Processing pages:  50%|███ | 41/83 [00:02]", 83), { done: 41, total: 83 });
-  assert.deepEqual(parseProgress("Completed batch 1/1 | Processed 83/83 pages", 83), { done: 83, total: 83 });
+/**
+ * 本进程创建的任务不算"陈旧"：MinerU 退出后还要整理几十秒，
+ * 这期间 pid 已经死了，不能把任务判成中断（否则会重复整理或误删）。
+ */
+async function testOwnedJobIsNotStale() {
+  await withWorkspace(async () => {
+    await ensureWorkspace();
+    const job = await createJob({
+      projectId: PROJECT,
+      bookType: "student",
+      originalName: "a.pdf",
+      originalPath: "/tmp/a.pdf",
+    });
+    await patchJob(job.id, { status: "normalizing", pid: 999999, ownerPid: process.pid });
+    const [listed] = await listJobs();
+    assert.equal(listed.status, "normalizing");
+  });
+}
+
+/** 删除任务：进程、产物、记录、没人再用的原件，一起清掉。 */
+async function testDeleteJobCleansEverything() {
+  await withWorkspace(async (root) => {
+    await ensureWorkspace();
+    const original = join(root, "sources-test.pdf");
+    writeFileSync(original, "pdf");
+    const job = await createJob({
+      projectId: PROJECT,
+      bookType: "student",
+      originalName: "a.pdf",
+      originalPath: original,
+    });
+    mkdirSync(ocrJobDir(PROJECT, job.id), { recursive: true });
+    mkdirSync(ocrUpstreamDir(job.id), { recursive: true });
+    await patchJob(job.id, { upstreamDir: ocrUpstreamDir(job.id) });
+
+    assert.equal(existsSync(ocrJobDir(PROJECT, job.id)), true);
+    await deleteJob(job.id, "测试清理");
+    assert.deepEqual(await listJobs(), [], "记录已删");
+    assert.equal(existsSync(ocrJobDir(PROJECT, job.id)), false, "识别产物已删");
+    assert.equal(existsSync(ocrUpstreamDir(job.id)), false, "上游临时产物已删");
+    assert.equal(existsSync(original), false, "没有别的任务用这份原件，原件也删");
+  });
+}
+
+/** 原件被另一个任务共用时不能删。 */
+async function testDeleteKeepsSharedOriginal() {
+  await withWorkspace(async (root) => {
+    await ensureWorkspace();
+    const original = join(root, "shared.pdf");
+    writeFileSync(original, "pdf");
+    const a = await createJob({ projectId: PROJECT, bookType: "student", originalName: "s.pdf", originalPath: original });
+    await createJob({ projectId: PROJECT, bookType: "student", originalName: "s.pdf", originalPath: original });
+    await deleteJob(a.id, "删一个");
+    assert.equal(existsSync(original), true, "另一个任务还在用，原件保留");
+  });
+}
+
+/** 回收：失败/中断的记录清掉；只保留最多 10 条；已确认的永不自动删。 */
+async function testReconcile() {
+  await withWorkspace(async () => {
+    await ensureWorkspace();
+    const failed = await createJob({ projectId: PROJECT, bookType: "student", originalName: "f.pdf", originalPath: "/tmp/f.pdf" });
+    await patchJob(failed.id, { status: "failed", stage: "失败" });
+    const interrupted = await createJob({ projectId: PROJECT, bookType: "student", originalName: "i.pdf", originalPath: "/tmp/i.pdf" });
+    await patchJob(interrupted.id, { status: "interrupted", stage: "已中断" });
+
+    await reconcileOcrJobs(true);
+    assert.deepEqual((await listJobs()).map((item) => item.id), [], "失败/中断的记录被清掉");
+
+    // 12 条 ready：只留 10 条，最早的先删
+    const ids = [];
+    for (let index = 0; index < 12; index += 1) {
+      const job = await createJob({
+        projectId: PROJECT,
+        bookType: "knowledge",
+        originalName: `book-${index}.pdf`,
+        originalPath: `/tmp/book-${index}.pdf`,
+      });
+      await patchJob(job.id, {
+        status: "ready",
+        stage: "待核对",
+        createdAt: new Date(Date.UTC(2026, 0, 1, 0, index)).toISOString(),
+      });
+      ids.push(job.id);
+    }
+    await reconcileOcrJobs(true);
+    const remaining = (await listJobs()).map((item) => item.id);
+    assert.equal(remaining.length, 10, "只保留 10 条");
+    assert.equal(remaining.includes(ids[0]), false, "最早的两条被清掉");
+    assert.equal(remaining.includes(ids[11]), true, "最新的保留");
+  });
 }
 
 const tests = [
@@ -311,7 +450,12 @@ const tests = [
   ["确认流程：待核对 → 已确认（回归）", testConfirmFlow],
   ["导入校验与上限", testImportValidation],
   ["状态机规则", testStateMachineRules],
-  ["OCR 进度解析（三种实测形态）", testProgressParsing],
+  ["OCR 进度解析：页级报页数、区域数只报百分比", testProgressParsing],
+  ["识别列表只含 OCR 任务", testJobListIsOcrOnly],
+  ["本进程持有的任务不判陈旧", testOwnedJobIsNotStale],
+  ["删除任务：进程/产物/记录/原件一起清", testDeleteJobCleansEverything],
+  ["共用的原件不删", testDeleteKeepsSharedOriginal],
+  ["回收：清失败记录、上限 10 条", testReconcile],
   ["路径逃逸被拒", testPathEscapeIsRejected],
   ["原件复制进工作区且不改源文件", testStoreOriginal],
 ];

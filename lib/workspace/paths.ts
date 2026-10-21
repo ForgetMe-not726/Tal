@@ -195,6 +195,22 @@ export function ocrJobDir(projectId: string, jobId: string): string {
 }
 
 /** 在跑任务的状态文件（可重建，不是事实源）。 */
+/**
+ * OCR 上游产物的**稳定落点**（不再用系统临时目录）。
+ *
+ * 为什么：MinerU 跑一本 83 页的书要几分钟，产物几百 MB。放在 `mkdtemp` 里，
+ * 应用一重启就找不到它，只能整本重跑。放到 `.app` 下（可重建区域）后，
+ * 重启可以**接着整理**已经跑完的结果。
+ */
+export function ocrUpstreamDir(jobId: string): string {
+  return join(appDir(), "ocr-upstream", safeSegment(jobId));
+}
+
+/** 识别失败/中断的原因留一行日志：任务记录会被清掉，但排查线索不能丢。 */
+export function ocrFailureLog(): string {
+  return join(appDir(), "logs", "ocr-failures.log");
+}
+
 export function jobFile(jobId: string): string {
   return join(jobsDir(), `${safeSegment(jobId)}.json`);
 }

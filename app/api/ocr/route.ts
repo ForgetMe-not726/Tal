@@ -9,7 +9,7 @@ import {
   assertImportable,
   listJobViews,
 } from "@/lib/ocr/jobs";
-import { engineStatus, startImport, startRecognition } from "@/lib/ocr/service";
+import { engineStatus, reconcileOcrJobs, startImport, startRecognition } from "@/lib/ocr/service";
 import { OcrError } from "@/lib/ocr/types";
 
 export const runtime = "nodejs";
@@ -87,6 +87,8 @@ export async function POST(request: Request) {
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
+    // 打开识别页就回收一次：清理失败/中断的任务、恢复重启前跑完的识别、限制记录条数
+    await reconcileOcrJobs();
     const projectId = url.searchParams.get("projectId")?.trim() || undefined;
     const bookType = url.searchParams.get("bookType")?.trim() || undefined;
     const jobs = await listJobViews({ projectId });

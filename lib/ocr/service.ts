@@ -9,16 +9,16 @@
  *    否则界面只会看到一个永远转圈的"识别中"。
  */
 
-import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import type { BookType } from "../db/types.ts";
 import { copyIntoWorkspace } from "../workspace/files.ts";
-import { originalsDir } from "../workspace/paths.ts";
+import { ocrUpstreamDir, originalsDir } from "../workspace/paths.ts";
 import { join as joinPath } from "node:path";
 import {
   assertImportable,
   createJob,
+  deleteJob,
+  listJobs,
   normalizeIntoWorkspace,
   patchJob,
   readJob,
@@ -32,6 +32,7 @@ import {
   mineruPython,
   spawnMineru,
   cancelProcessTree,
+  isProcessAlive,
   type MineruHandle,
 } from "./mineru.ts";
 import { countPdfPages } from "./pages.ts";
@@ -53,18 +54,13 @@ function inBackground(jobId: string, task: () => Promise<void>): void {
   void task().catch(async (error: unknown) => {
     const message = (error as Error)?.message ?? "未知错误";
     try {
-      // 老师主动取消时，被杀的进程会以非 0 退出——那不是失败，别把状态改回去。
+      // 老师主动取消时，记录已被清理掉；这里读不到就说明已经处理过了。
       const current = await readJob(jobId).catch(() => null);
-      if (current?.status === "cancelled") return;
-      await patchJob(jobId, {
-        status: "failed",
-        stage: "失败",
-        message,
-        pid: undefined,
-        finishedAt: new Date().toISOString(),
-      });
+      if (!current) return;
+      // 失败不留记录，也不留产物：杀进程 + 删页图/临时文件，老师重新导入即可
+      await deleteJob(jobId, message);
     } catch {
-      // 连状态都写不进去（工作区没了）：到此为止，别再抛
+      // 连清理都做不了（工作区没了）：到此为止，别再抛
     }
   });
 }
@@ -105,6 +101,76 @@ async function normalizeJob(
 }
 
 /**
+ * 跑一次 MinerU：进度写进任务记录，成功后归一化。
+ *
+ * 上游产物写在**稳定目录**（`<ws>/.app/ocr-upstream/<jobId>/`）而不是系统临时目录：
+ * 应用重启后还能接着整理，不必整本重跑。
+ */
+async function recognizeInto(job: OcrJobRecord): Promise<void> {
+  const outDir = job.upstreamDir ?? ocrUpstreamDir(job.id);
+  await mkdir(outDir, { recursive: true });
+  if (!job.upstreamDir) await patchJob(job.id, { upstreamDir: outDir }).catch(() => undefined);
+
+  // 页数以 PDF 为准：上游日志的进度条里混着区域数，不能当页数用
+  const pageCount = await countPdfPages(job.originalPath, mineruPython());
+  if (pageCount != null) {
+    await patchJob(job.id, { pagesTotal: pageCount, pagesDone: 0, pagesSource: "pdf" }).catch(() => undefined);
+  }
+
+  let lastProgress = "";
+  const handle = spawnMineru({
+    pdfPath: job.originalPath,
+    outDir,
+    options: DEFAULT_MINERU_OPTIONS,
+    expectedPages: pageCount,
+    onProgress: (progress) => {
+      const key =
+        progress.kind === "pages"
+          ? `pages:${progress.done}/${progress.total}`
+          : `phase:${progress.label}:${progress.percent}`;
+      if (key === lastProgress) return;
+      lastProgress = key;
+      // 页级阶段报页数；其它阶段（文字识别等）只报百分比——**不能**当页数，
+      // 否则 83 页的书会显示成 1668 页，或者被丢弃后一直停在 0/83。
+      const patch =
+        progress.kind === "pages"
+          ? {
+              ...(progress.done != null ? { pagesDone: progress.done } : {}),
+              pagesTotal: progress.total,
+              stage:
+                progress.done != null
+                  ? `识别中 ${progress.done}/${progress.total} 页`
+                  : `识别中（共 ${progress.total} 页）`,
+            }
+          : { stage: `识别中 · ${progress.label} ${progress.percent}%` };
+      // 进度写入失败不该打断识别本身
+      void patchJob(job.id, patch).catch(() => undefined);
+    },
+  });
+  running.set(job.id, handle);
+  await patchJob(job.id, {
+    status: "running",
+    pid: handle.pid,
+    stage: "识别中",
+    startedAt: new Date().toISOString(),
+  });
+  try {
+    await handle.done;
+    const logTail = handle.logTail();
+    // 先把上游日志落到任务记录：失败时这是唯一的线索
+    await patchJob(job.id, { logTail });
+    await normalizeJob(job, outDir, { logTail });
+    // 成功才清理上游产物（几百 MB）
+    await rm(outDir, { recursive: true, force: true });
+  } catch (error) {
+    await patchJob(job.id, { logTail: handle.logTail() }).catch(() => undefined);
+    throw error;
+  } finally {
+    running.delete(job.id);
+  }
+}
+
+/**
  * 新建一次识别任务（原文件已经由路由流式写进 `sources/originals/`）。
  */
 export async function startRecognition(input: {
@@ -124,56 +190,7 @@ export async function startRecognition(input: {
     originalPath: input.originalPath,
   });
 
-  inBackground(job.id, async () => {
-    const outDir = await mkdtemp(join(tmpdir(), `ocr-${job.id.slice(0, 8)}-`));
-    // 页数以 PDF 为准：上游日志的进度条里混着区域数，不能当页数用
-    const pageCount = await countPdfPages(input.originalPath, mineruPython());
-    if (pageCount != null) {
-      await patchJob(job.id, { pagesTotal: pageCount, pagesDone: 0 }).catch(() => undefined);
-    }
-    let lastProgress = "";
-    const handle = spawnMineru({
-      pdfPath: input.originalPath,
-      outDir,
-      options: DEFAULT_MINERU_OPTIONS,
-      expectedPages: pageCount,
-      onProgress: (progress) => {
-        const key = `${progress.done}/${progress.total}`;
-        if (key === lastProgress) return;
-        lastProgress = key;
-        // 进度写入失败不该打断识别本身
-        const total = pageCount ?? progress.total;
-        const done = progress.done == null ? null : Math.min(progress.done, total);
-        void patchJob(job.id, {
-          ...(done != null ? { pagesDone: done } : {}),
-          pagesTotal: total,
-          stage:
-            done != null ? `识别中 ${done}/${total} 页` : `识别中（共 ${total} 页）`,
-        }).catch(() => undefined);
-      },
-    });
-    running.set(job.id, handle);
-    await patchJob(job.id, {
-      status: "running",
-      pid: handle.pid,
-      stage: "识别中",
-      startedAt: new Date().toISOString(),
-    });
-    try {
-      await handle.done;
-      const logTail = handle.logTail();
-      // 先把上游日志落到任务记录：失败时这是唯一的线索
-      await patchJob(job.id, { logTail });
-      await normalizeJob(job, outDir, { logTail });
-      // 成功才清理上游产物（约 750 MB）；失败时留着，重试可直接复用
-      await rm(outDir, { recursive: true, force: true });
-    } catch (error) {
-      await patchJob(job.id, { logTail: handle.logTail() }).catch(() => undefined);
-      throw error;
-    } finally {
-      running.delete(job.id);
-    }
-  });
+  inBackground(job.id, () => recognizeInto(job));
 
   return job;
 }
@@ -224,7 +241,12 @@ export async function startImport(input: {
   return job;
 }
 
-/** 取消：杀进程树，保留原文件与日志。 */
+/**
+ * 取消：**杀进程并清理**。
+ *
+ * 产品口径（2026-10-21）：取消/失败/中断都不留任务记录和产物；
+ * 老师重新导入 PDF 即可。已确认的来源不能取消（那是资料库事实源）。
+ */
 export async function cancelJob(jobId: string): Promise<OcrJobRecord> {
   const job = await readJob(jobId);
   // 确认状态的事实源是 manifest（任务记录只管这次运行的过程）
@@ -238,13 +260,9 @@ export async function cancelJob(jobId: string): Promise<OcrJobRecord> {
     // 服务重启后的遗留任务：进程可能还活着，按 pid 再杀一次
     cancelProcessTree(job.pid);
   }
-  return patchJob(jobId, {
-    status: "cancelled",
-    stage: "已取消",
-    message: "已取消识别。原文件已保留，可以重新识别。",
-    pid: undefined,
-    finishedAt: new Date().toISOString(),
-  });
+  await deleteJob(jobId, "老师取消了识别");
+  const now = new Date().toISOString();
+  return { ...job, status: "cancelled", stage: "已取消", pid: undefined, finishedAt: now, updatedAt: now };
 }
 
 /** 重试：用同一份原件重跑一次（进度与产物都会重写）。 */
@@ -259,33 +277,7 @@ export async function retryJob(jobId: string): Promise<OcrJobRecord> {
   if (!ready.ready) throw new OcrError(ready.reason ?? "OCR 引擎不可用");
 
   await patchJob(jobId, { status: "queued", stage: "待识别", message: undefined, logTail: [] });
-  inBackground(jobId, async () => {
-    const outDir = await mkdtemp(join(tmpdir(), `ocr-${jobId.slice(0, 8)}-`));
-    const handle = spawnMineru({
-      pdfPath: job.originalPath,
-      outDir,
-      options: DEFAULT_MINERU_OPTIONS,
-    });
-    running.set(jobId, handle);
-    await patchJob(jobId, {
-      status: "running",
-      pid: handle.pid,
-      stage: "识别中",
-      startedAt: new Date().toISOString(),
-    });
-    try {
-      await handle.done;
-      const logTail = handle.logTail();
-      await patchJob(jobId, { logTail });
-      await normalizeJob(job, outDir, { logTail });
-      await rm(outDir, { recursive: true, force: true });
-    } catch (error) {
-      await patchJob(jobId, { logTail: handle.logTail() }).catch(() => undefined);
-      throw error;
-    } finally {
-      running.delete(jobId);
-    }
-  });
+  inBackground(jobId, () => recognizeInto(job));
   return readJob(jobId);
 }
 
@@ -295,3 +287,101 @@ export async function engineStatus(): Promise<{ ready: boolean; reason?: string 
 }
 
 export { mineruPython, storeOriginal };
+
+/**
+ * 回收与恢复：每次打开识别页时跑一次（限流 5 秒）。
+ *
+ * 三件事，对应产品口径（2026-10-21）：
+ * 1. **失败/中断/取消的任务全部清理**（杀进程、删页图与临时产物、删记录）；
+ * 2. **重启后能接着跑**：上游产物在稳定目录里，进程还活着就等它，跑完了直接整理；
+ * 3. **最多保留 10 条记录**（已确认的来源是资料库事实源，永不自动删）。
+ */
+const resuming = new Set<string>();
+let lastReconcile = 0;
+
+export async function reconcileOcrJobs(force = false): Promise<void> {
+  const now = Date.now();
+  if (!force && now - lastReconcile < 5000) return;
+  lastReconcile = now;
+
+  const records = await listJobs();
+  for (const record of records) {
+    if (running.has(record.id) || resuming.has(record.id)) continue;
+
+    if (record.status === "failed" || record.status === "interrupted" || record.status === "cancelled") {
+      // 中断但**上游产物已经跑完**：接着整理比让老师重跑 5 分钟更划算
+      if (record.status === "interrupted" && (await upstreamComplete(record))) {
+        void finishResumed(record);
+        continue;
+      }
+      await deleteJob(record.id, `任务${record.status}，自动清理`);
+      continue;
+    }
+    if (record.status !== "running" && record.status !== "queued" && record.status !== "normalizing") continue;
+
+    // 运行中但没有句柄 = 应用重启后的遗留任务
+    if (record.pid != null && isProcessAlive(record.pid)) {
+      watchResumed(record);
+      continue;
+    }
+    // 进程没了：上游产物齐全就接着整理，否则清理
+    if (await upstreamComplete(record)) {
+      void finishResumed(record);
+    } else {
+      await deleteJob(record.id, "识别中断（进程已退出且没有可复用的产物）");
+    }
+  }
+  await capJobRecords();
+}
+
+async function upstreamComplete(record: OcrJobRecord): Promise<boolean> {
+  if (!record.upstreamDir) return false;
+  try {
+    const upstream = await locateUpstream(record.upstreamDir, DEFAULT_MINERU_OPTIONS.method);
+    return Boolean(upstream.contentListPath && upstream.middlePath);
+  } catch {
+    return false;
+  }
+}
+
+/** 进程还活着：每 2 秒看一眼，退出后接着整理。 */
+function watchResumed(record: OcrJobRecord): void {
+  resuming.add(record.id);
+  const timer = setInterval(async () => {
+    if (isProcessAlive(record.pid)) return;
+    clearInterval(timer);
+    resuming.delete(record.id);
+    const latest = await readJob(record.id).catch(() => null);
+    if (latest) await finishResumed(latest);
+  }, 2000);
+  timer.unref?.();
+}
+
+/** 把重启前跑完/刚跑完的上游产物整理进工作区；失败就清理。 */
+async function finishResumed(record: OcrJobRecord): Promise<void> {
+  if (!record.upstreamDir) {
+    await deleteJob(record.id, "没有可复用的上游产物");
+    return;
+  }
+  try {
+    await normalizeJob(record, record.upstreamDir, { logTail: record.logTail ?? [] });
+    await rm(record.upstreamDir, { recursive: true, force: true });
+  } catch (error) {
+    await deleteJob(record.id, `恢复识别失败：${(error as Error).message}`);
+  }
+}
+
+/** 最多保留 10 条记录；超出时从**未确认**的最旧记录开始清。 */
+async function capJobRecords(limit = 10): Promise<void> {
+  const records = await listJobs();
+  let overflow = records.length - limit;
+  if (overflow <= 0) return;
+  const oldestFirst = [...records].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  for (const record of oldestFirst) {
+    if (overflow <= 0) break;
+    const manifest = await readManifest(record.projectId, record.id).catch(() => null);
+    if (manifest?.status === "confirmed") continue; // 资料库事实源，永不自动删
+    await deleteJob(record.id, `识别记录超过 ${limit} 条，自动清理较早的记录`);
+    overflow -= 1;
+  }
+}

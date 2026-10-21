@@ -187,9 +187,11 @@ export function RecognizeLeftPanel({
                     {job.originalName}
                   </span>
                   <span className="mt-0.5 block text-[10px] text-ink-3">
-                    {job.pagesDone != null && job.pagesTotal != null
-                      ? `${job.pagesDone}/${job.pagesTotal} 页`
-                      : job.stage}
+                    {["queued", "running", "normalizing"].includes(job.status)
+                      ? job.stage
+                      : job.pagesTotal != null
+                        ? `${job.pagesTotal} 页`
+                        : job.stage}
                   </span>
                   {job.message && (
                     <span className="mt-0.5 block text-[10px] leading-relaxed text-amber-800">

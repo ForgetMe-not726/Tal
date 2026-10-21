@@ -39,6 +39,8 @@ export default function RecognizePage() {
   const [confirming, setConfirming] = React.useState(false);
   const [toast, setToast] = React.useState<string | null>(null);
   const requestEpoch = React.useRef(0);
+  /** 上一轮的任务列表：用来发现"运行中的任务突然不见了"（失败/中断已被后端清理）。 */
+  const jobsRef = React.useRef<OcrJobView[]>([]);
   /** 已经加载过正文与结构的任务；轮询不会重复拉。 */
   const loadedJobId = React.useRef<string | null>(null);
 
@@ -75,7 +77,20 @@ export default function RecognizePage() {
       };
       if (!response.ok) throw new Error(data.error ?? "任务列表加载失败");
       if (epoch !== requestEpoch.current) return;
-      setJobs(data.jobs ?? []);
+      const next = data.jobs ?? [];
+      // 失败/中断的任务会被后端清理掉：这里要告诉老师"刚才那份没成，请重新导入"，
+      // 否则它只是从列表里消失，看着像什么都没发生。
+      const lost = jobsRef.current.find(
+        (item) =>
+          ["queued", "running", "normalizing"].includes(item.status) &&
+          !next.some((job) => job.id === item.id),
+      );
+      if (lost) {
+        setToast(`「${lost.originalName}」识别中断或失败，临时文件与记录已清理，请重新导入。`);
+        setSelectedJobId((current) => (current === lost.id ? null : current));
+      }
+      jobsRef.current = next;
+      setJobs(next);
       if (data.engine) setEngine(data.engine);
     },
     [],
@@ -133,6 +148,7 @@ export default function RecognizePage() {
   );
 
   React.useEffect(() => {
+    // 选中被清空（任务已清理）时不再渲染详情：下面的渲染条件同时要求 selectedJobId 与 detail
     if (!selectedJobId) return;
     const epoch = requestEpoch.current;
     void loadDetail(selectedJobId, epoch).catch((error: unknown) =>

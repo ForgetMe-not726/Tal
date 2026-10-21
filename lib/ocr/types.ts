@@ -124,6 +124,13 @@ export type OcrJobRecord = {
   pagesTotal?: number | null;
   /** 页数的来源：`pdf` = 直接读 PDF 得到的真实页数（旧记录没有这个标记）。 */
   pagesSource?: "pdf";
+  /** 上游产物的落点（稳定目录）。服务重启后据此接着整理，不必整本重跑。 */
+  upstreamDir?: string;
+  /**
+   * 创建这个任务的进程。**本进程持有的任务不做"陈旧"判定**——
+   * MinerU 退出后还要整理几十秒，这期间 pid 已经死了，不能当成中断。
+   */
+  ownerPid?: number;
   /** 阶段说明（给老师看的一句话）。 */
   stage: string;
   message?: string;

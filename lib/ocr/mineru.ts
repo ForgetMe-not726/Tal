@@ -151,25 +151,62 @@ async function isDirectory(path: string): Promise<boolean> {
 }
 
 /** 进度行的解析（纯函数）。拿不到就返回 null——**不编造百分比**。 */
+/** 上游阶段的中文名：界面直接显示，不把 MinerU 的英文阶段名丢给老师。 */
+const PHASE_LABEL: Record<string, string> = {
+  "ocr-rec predict": "文字识别",
+  "ocr-det ch": "文字检测",
+  "ocr-det": "文字检测",
+  "layout predict": "版面分析",
+  "table-ocr rec ch": "表格文字",
+  "table-ocr det": "表格检测",
+  "table orientation det": "表格方向",
+  "table orientation score": "表格方向",
+  "table orientation": "表格方向",
+  "table-wireless predict": "表格识别",
+  "table-wired predict": "表格识别",
+  "seal predict": "印章检测",
+  "processing pages": "页面处理",
+};
+
+export type MineruProgress =
+  /** 页级进度：`done/total` 都是页数。 */
+  | { kind: "pages"; done: number | null; total: number }
+  /** 其它阶段：只有百分比。**不能当页数**——`OCR-rec 1668/1668` 是文字区域。 */
+  | { kind: "phase"; label: string; percent: number };
+
+function phaseLabel(raw: string): string {
+  const key = raw.trim().replace(/[:：]\s*$/, "").toLocaleLowerCase();
+  return PHASE_LABEL[key] ?? raw.trim();
+}
+
+/**
+ * 解析 MinerU 的一行日志。
+ *
+ * **页数只认页级阶段**：`Processing pages: 41/83`、`Layout Predict: 16/52`
+ * （且 `Layout Predict` 在分批时可能是 `19/19`，所以给了 `expectedTotal` 就必须核对）。
+ * 其余 tqdm 条是**区域/批次**（`OCR-rec Predict: 1668/1668`），只取百分比用来显示"还在跑"。
+ *
+ * 这条区别很关键：一本 83 页的书，文字识别阶段要跑 3 分钟，旧实现把它当页数、
+ * 又因为分母对不上而丢弃，界面就一直是 0/83——看起来像卡死。
+ */
 export function parseProgress(
   line: string,
   expectedTotal?: number | null,
-): { done: number | null; total: number } | null {
-  // MinerU 的 tqdm 进度条里，**只有页级阶段**的分子分母是页数：
-  //   `Layout Predict: 31%|███| 16/52 [00:12<00:29]`      ← 页
-  //   `Processing pages: 100%|███| 65/65 [00:02<00:00]`   ← 页
-  // 其余是**区域/批次**，不能当页数：
-  //   `OCR-rec Predict: 89%|███| 852/954`                 ← 文字区域
-  //   `OCR-det ch: 71%|███| 12/17`                        ← 检测批次
-  // 实测一本 83 页的书因此显示成 "1314/1668 页"。
-  const pageBar = /^\s*(?:Layout Predict|Processing pages)\s*:.*?(\d+)\/(\d+)\s*\[/i.exec(line);
-  if (pageBar) {
-    const done = Number(pageBar[1]);
-    const total = Number(pageBar[2]);
-    if (Number.isFinite(done) && Number.isFinite(total) && total > 0 && done <= total) {
+): MineruProgress | null {
+  const bar = /^\s*([^|]{2,40}?):\s*(\d+)%.*?(\d+)\/(\d+)\s*\[/u.exec(line);
+  if (bar) {
+    const label = bar[1]!.trim();
+    const done = Number(bar[3]);
+    const total = Number(bar[4]);
+    if (!Number.isFinite(done) || !Number.isFinite(total) || total <= 0) return null;
+    const pageLevel = /^(?:layout predict|processing pages)$/iu.test(label);
+    if (pageLevel) {
+      if (done > total) return null;
+      // 分批时 Layout Predict 的分母可能只是本批页数，和真实页数对不上就丢掉
       if (expectedTotal != null && total !== expectedTotal) return null;
-      return { done, total };
+      return { kind: "pages", done, total };
     }
+    return { kind: "phase", label: phaseLabel(label), percent: Math.min(100, Math.round((done / total) * 100)) };
   }
   const processed = /Processed\s+(\d+)\s*\/\s*(\d+)\s+pages/i.exec(line);
   if (processed) {
@@ -177,7 +214,7 @@ export function parseProgress(
     const total = Number(processed[2]);
     if (Number.isFinite(done) && Number.isFinite(total) && total > 0) {
       if (expectedTotal != null && total !== expectedTotal) return null;
-      return { done: Math.min(done, total), total };
+      return { kind: "pages", done: Math.min(done, total), total };
     }
   }
   const totalOnly = /(\d+)\s+pages total/i.exec(line);
@@ -185,7 +222,7 @@ export function parseProgress(
     const total = Number(totalOnly[1]);
     if (Number.isFinite(total) && total > 0) {
       if (expectedTotal != null && total !== expectedTotal) return null;
-      return { done: null, total };
+      return { kind: "pages", done: null, total };
     }
   }
   return null;
@@ -217,7 +254,7 @@ export function spawnMineru(input: {
   options?: MineruRunOptions;
   /** PDF 的真实页数；给了就只认分母与它一致的进度（过滤掉区域数）。 */
   expectedPages?: number | null;
-  onProgress?: (progress: { done: number | null; total: number }) => void;
+  onProgress?: (progress: MineruProgress) => void;
 }): MineruHandle {
   const executable = mineruExecutable();
   const [command, ...args] = mineruCommand({ executable, ...input });

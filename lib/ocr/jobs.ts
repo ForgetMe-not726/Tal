@@ -9,12 +9,12 @@
  */
 
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { appendFile, mkdir, readFile, rm } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { copyDirFiles, copyIntoWorkspace, readBinary, writeBinaryAtomic } from "../workspace/files.ts";
 import { listDir, readJson, readJsonDir, updateJson, writeJson } from "../workspace/json.ts";
-import { jobFile, jobsDir, ocrDir, ocrJobDir, originalsDir, safeSegment } from "../workspace/paths.ts";
-import { isProcessAlive, mineruPython } from "./mineru.ts";
+import { jobFile, jobsDir, ocrDir, ocrFailureLog, ocrJobDir, originalsDir, safeSegment } from "../workspace/paths.ts";
+import { cancelProcessTree, isProcessAlive, mineruPython } from "./mineru.ts";
 import { countPdfPages } from "./pages.ts";
 import {
   buildContentMarkdown,
@@ -86,6 +86,7 @@ export async function createJob(input: {
     stage: "待识别",
     pagesDone: null,
     pagesTotal: null,
+    ownerPid: process.pid,
     createdAt: now,
     updatedAt: now,
   };
@@ -128,7 +129,15 @@ export async function listJobs(filter: { projectId?: string } = {}): Promise<Ocr
   const repaired: OcrJobRecord[] = [];
   for (let record of records) {
     if (!record || !record.id) continue;
+    // `.app/jobs` 是**共用**目录：审校任务也写在这里。只看带 bookType 的 OCR 记录，
+    // 否则审校任务会出现在识别列表里（originalName 为空），上限清理还可能把它们删掉。
+    if (!record.bookType) continue;
     if (record.status === "running" || record.status === "queued" || record.status === "normalizing") {
+      // 本进程创建的任务还在自己手里（可能在等 MinerU，也可能在整理结果）——不算陈旧
+      if (record.ownerPid === process.pid) {
+        repaired.push(record);
+        continue;
+      }
       if (!alive.has(record.id)) alive.set(record.id, isProcessAlive(record.pid));
       if (!alive.get(record.id)) {
         const updated = await patchJob(record.id, {
@@ -177,6 +186,50 @@ export async function listJobs(filter: { projectId?: string } = {}): Promise<Ocr
     ? repaired.filter((record) => record.projectId === filter.projectId)
     : repaired;
   return filtered.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/**
+ * 删掉一个任务：**杀进程 → 记原因 → 删产物 → 删记录**。
+ *
+ * 产品口径（2026-10-21）：只有识别成功的书目留在任务列表里；失败、中断、取消的
+ * 一律清理干净，老师重新导入即可。OCR 的上游产物动辄几百 MB，留着不只是"多一条记录"，
+ * 会连同页图和临时文件一起占满工作区。
+ */
+export async function deleteJob(jobId: string, reason: string): Promise<void> {
+  const record = await readJob(jobId).catch(() => null);
+  if (!record) return;
+
+  // 1) 还在跑的进程必须先杀（Windows 要杀进程树，否则留下 mineru-api 孤儿）
+  if (record.pid) cancelProcessTree(record.pid);
+
+  // 2) 任务记录马上要删，失败原因单独留一行日志，排查时还有线索
+  try {
+    await mkdir(dirname(ocrFailureLog()), { recursive: true });
+    await appendFile(
+      ocrFailureLog(),
+      `${new Date().toISOString()}	${record.originalName ?? record.id}	${record.status}	${reason.replace(/\s+/gu, " ").slice(0, 400)}
+`,
+      "utf8",
+    );
+  } catch {
+    // 写不了日志不影响清理
+  }
+
+  // 3) 产物：识别结果 + 上游临时产物
+  await rm(ocrJobDir(record.projectId, jobId), { recursive: true, force: true }).catch(() => undefined);
+  if (record.upstreamDir) {
+    await rm(record.upstreamDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+
+  // 4) 记录
+  await rm(jobFile(jobId), { force: true }).catch(() => undefined);
+
+  // 5) 原件：没有别的任务再用同一个文件时才删（避免删掉已确认来源的原件）
+  if (record.originalPath) {
+    const remaining = await readJsonDir<OcrJobRecord>(jobsDir());
+    const stillUsed = remaining.some((item) => item.originalPath === record.originalPath);
+    if (!stillUsed) await rm(record.originalPath, { force: true }).catch(() => undefined);
+  }
 }
 
 // ---------------------------------------------------------------------------

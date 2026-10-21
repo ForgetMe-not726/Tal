@@ -9,6 +9,7 @@
 
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
+import { lessonsDir, projectsDir, reviewDir } from "../workspace/paths.ts";
 import { listDir, readJson, readJsonDir, updateJson, writeJson } from "../workspace/json.ts";
 import {
   REVIEW_DECISIONS_FILE,
@@ -98,12 +99,54 @@ export async function patchJobRecord(
  * 说明进程中途没了（应用重启/崩溃）→ 标 `interrupted`，界面给"重新审校"。
  * 不修正的话界面会一直转圈。
  */
+/**
+ * 从产物恢复缺失的任务记录。
+ *
+ * 起因：`.app/jobs` 是 OCR 与审校**共用**的目录，曾经被识别侧的清理逻辑误删过审校记录
+ * （产物目录还在、任务列表里却没了）。任务记录是可重建的——manifest 里全都有。
+ * 只补**缺失**的，不覆盖已有记录。
+ */
+export async function restoreMissingReviewJobRecords(): Promise<number> {
+  let restored = 0;
+  for (const projectId of await listDir(projectsDir())) {
+    for (const lessonName of await listDir(lessonsDir(projectId))) {
+      const lessonNumber = Number(/lesson-(\d+)/u.exec(lessonName)?.[1]);
+      if (!Number.isInteger(lessonNumber)) continue;
+      for (const jobId of await listDir(reviewDir(projectId, lessonNumber))) {
+        const manifest = await readJson<ReviewManifest | null>(
+          join(reviewDir(projectId, lessonNumber), jobId, "manifest.json"),
+          null,
+        );
+        if (!manifest?.jobId) continue;
+        const existing = await readJson<ReviewJobRecord | null>(jobFile(manifest.jobId), null);
+        if (existing) continue;
+        const status = manifest.status ?? "ready";
+        const now = manifest.updatedAt ?? manifest.createdAt ?? new Date().toISOString();
+        await writeJson(jobFile(manifest.jobId), {
+          id: manifest.jobId,
+          projectId,
+          lessonNumber,
+          status,
+          stage: REVIEW_STAGE_LABEL[status] ?? "待人工复核",
+          createdAt: manifest.createdAt ?? now,
+          updatedAt: now,
+          ...(manifest.finishedAt ? { finishedAt: manifest.finishedAt } : {}),
+        } satisfies ReviewJobRecord);
+        restored += 1;
+      }
+    }
+  }
+  return restored;
+}
+
 export async function listJobRecords(
   filter: { projectId?: string; lessonNumber?: number } = {},
   options: { staleAfterMs?: number; now?: number } = {},
 ): Promise<ReviewJobRecord[]> {
   const staleAfterMs = options.staleAfterMs ?? 10 * 60 * 1000;
   const nowMs = options.now ?? Date.now();
+  // 记录可能被误删过（`.app/jobs` 与识别共用）：先从产物补回来
+  await restoreMissingReviewJobRecords();
   const records = await readJsonDir<ReviewJobRecord>(jobsDir());
   const out: ReviewJobRecord[] = [];
   for (const record of records) {
