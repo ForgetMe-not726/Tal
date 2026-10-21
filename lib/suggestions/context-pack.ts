@@ -172,5 +172,6 @@ ${pack.module.markdown}
    evidence（依据的来源，必须是上面列出的 source_ref）、uncertainty（哪里没把握、缺什么资料）。
 3. **找不到正文依据就不要报**；资料不足时在 uncertainty 里说明缺什么，不要用模型常识冒充规则或参考资料。
 4. 不要重述规则、不要输出与正文无关的通评、不要给整篇改写。
-5. 只输出 JSON：{"suggestions":[{"kind":"replace","original_text":"","replacement_text":"","reason":"","rule_ids":[],"evidence":[],"uncertainty":""}]}`;
+5. **最多 10 条建议**，按重要性取舍；宁可少而准，不要把所有句子都改一遍。
+6. 只输出 JSON：{"suggestions":[{"kind":"replace","original_text":"","replacement_text":"","reason":"","rule_ids":[],"evidence":[],"uncertainty":""}]}`;
 }

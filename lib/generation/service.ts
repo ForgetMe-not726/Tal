@@ -76,6 +76,12 @@ export type GenerationResult = {
   retrieval: ReturnType<typeof buildKnowledgeContext>["trace"];
   ai: Pick<AiResult, "model" | "provider" | "usage" | "latencyMs" | "stopReason">;
   sourceRefs: string[];
+  /** 本次参考的范本（知识库集合里的同模块定稿）；没有范本时为 null。 */
+  exemplar: {
+    collectionTitle: string;
+    lessonNumber: number;
+    pages: [number, number] | null;
+  } | null;
 };
 
 function requireText(value: unknown, label: string): string {
@@ -540,8 +546,10 @@ export async function generateModule(request: GenerationRequest, signal?: AbortS
     await findExemplars({
       bookType: context.bookType,
       moduleKey: context.moduleKey,
+      grade: context.grade,
       maxChunks: 1,
-      maxChars: 6000,
+      // 一个模块正文通常 3–8 KB；6000 会把 7 KB 的范本整个跳过（实测跳过了最接近的 L9）
+      maxChars: 9000,
     })
   ).chunks;
   throwIfAborted(signal);
@@ -684,6 +692,14 @@ export async function generateModule(request: GenerationRequest, signal?: AbortS
           stopReason: undefined,
         },
     sourceRefs: knowledgeContext.sourceRefs,
+    // 老师要能知道"这次参考了哪份范本"——否则输出像某本书却说不清为什么
+    exemplar: exemplars[0]
+      ? {
+          collectionTitle: exemplars[0].collectionTitle,
+          lessonNumber: exemplars[0].lessonNumber,
+          pages: exemplars[0].pages,
+        }
+      : null,
   };
 }
 

@@ -92,7 +92,8 @@ export async function generateSuggestions(request: SuggestionRequest): Promise<S
       "老师的要求是本次任务目标；规则是判断依据，不要逐条机械对照。" +
       "必须输出 JSON 对象，不要输出 Markdown 围栏外的解释。",
     messages: [{ role: "user", content: renderSuggestionPrompt(pack) }],
-    maxTokens: 4096,
+    // 4096 在长模块上会被输出上限截断（实测 3 次里 1 次整轮失败）；给一倍余量
+    maxTokens: 8192,
   });
   if (result.stopReason === "max_tokens") {
     throw new SuggestionServiceError("建议输出达到长度上限，请缩小正文或修改要求后重试");

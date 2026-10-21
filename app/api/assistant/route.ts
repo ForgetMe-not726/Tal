@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { activeAdapter } from "@/lib/assistant/adapter";
-import { collectCorpora } from "@/lib/assistant/local-search";
+import { collectPlanContext } from "@/lib/assistant/local-search";
 import { planQuery } from "@/lib/assistant/planner";
 import { AssistantError, type AssistantQuery, type AssistantScope, type AssistantSourceKind } from "@/lib/assistant/types";
 import { aiConfigured } from "@/lib/ai/gateway";
@@ -45,14 +45,10 @@ export async function POST(request: Request) {
     const body = (await request.json()) as Record<string, unknown>;
     const query = normalize(body);
 
-    // 校验模型给的过滤条件要用工作区里真实存在的值，所以先取一遍语料
-    const corpora = await collectCorpora(query);
+    // 校验模型给的过滤条件：只取元数据（课次/模块标识），不把整个语料读一遍
+    const known = await collectPlanContext(query);
     const plan = await planQuery(query.query, {
-      known: {
-        bookTypes: ["student", "workbook", "knowledge", "vocab"],
-        lessonNumbers: [...new Set(corpora.lessons.map((item) => item.lesson.lesson_number))].sort((a, b) => a - b),
-        moduleKeys: [...new Set(corpora.versions.map((item) => item.moduleKey))].sort(),
-      },
+      known: { bookTypes: ["student", "workbook", "knowledge", "vocab"], ...known },
       aiAvailable: aiConfigured(),
     });
 

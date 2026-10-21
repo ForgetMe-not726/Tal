@@ -153,13 +153,17 @@ export async function readCollectionChunk(
 export async function findExemplars(input: {
   bookType: BookType;
   moduleKey: string;
+  /** 只取同年级的范本（有多个年级的集合时，别把 L4 的范本喂给 L5）。 */
+  grade?: string;
   maxChunks?: number;
   maxChars?: number;
   root?: string;
 }): Promise<{ chunks: CollectionChunk[]; omitted: number }> {
   const maxChunks = input.maxChunks ?? 2;
   const maxChars = input.maxChars ?? 8000;
-  const manifests = (await listCollectionManifests(input.root)).filter((item) => item.kind === "exemplar");
+  const manifests = (await listCollectionManifests(input.root)).filter(
+    (item) => item.kind === "exemplar" && (!input.grade || item.grade === input.grade),
+  );
 
   const candidates: CollectionChunk[] = [];
   for (const manifest of manifests) {

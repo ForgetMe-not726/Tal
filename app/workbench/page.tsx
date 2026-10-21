@@ -40,6 +40,8 @@ type GenerationResponse = {
   checks: BlockCheck[];
   sourceRefs?: string[];
   migrationPlan?: { requiresHumanReview: boolean; summary?: { copy: number; adapt: number; generate: number } };
+  /** 本次参考的范本（知识库集合里的同模块定稿）；没有范本时为 null。 */
+  exemplar?: { collectionTitle: string; lessonNumber: number; pages: [number, number] | null } | null;
 };
 
 type SaveResponse = { version: { id: string }; checks?: BlockCheck[] };
@@ -448,7 +450,7 @@ export default function WorkbenchPage() {
     module: ModuleDef,
     controller: AbortController,
     epoch: number,
-  ): Promise<{ block: GeneratedBlock; warnings: number } | null> {
+  ): Promise<{ block: GeneratedBlock; warnings: number; exemplar?: GenerationResponse["exemplar"] } | null> {
     const moduleKey = module.moduleKey ?? module.id;
     const sourceText = sourceTextForModule(moduleKey);
     if (!sourceText) {
@@ -493,6 +495,7 @@ export default function WorkbenchPage() {
     if (epoch !== requestEpoch.current) return null;
     return {
       warnings: data.checks.length,
+      exemplar: data.exemplar,
       block: {
         id: `${module.id}-${data.version.id}`,
         moduleLabel: module.label,
@@ -555,10 +558,15 @@ export default function WorkbenchPage() {
       setBlocks((previous) => [...previous, { ...result.block, seq: previous.length + 1 }]);
       setSelectedBlockId(result.block.id);
       setSuggestionState(null);
+      const exemplarNote = result.exemplar
+        ? `（参考范本：${result.exemplar.collectionTitle} · Lesson ${result.exemplar.lessonNumber}${
+            result.exemplar.pages ? ` p.${result.exemplar.pages[0] + 1}–${result.exemplar.pages[1] + 1}` : ""
+          }）`
+        : "";
       setToast(
         result.warnings > 0
-          ? `「${module.label}」已生成；发现 ${result.warnings} 个检查问题`
-          : `「${module.label}」已生成`,
+          ? `「${module.label}」已生成${exemplarNote}；发现 ${result.warnings} 个检查问题`
+          : `「${module.label}」已生成${exemplarNote}`,
       );
     } catch (error) {
       if (epoch !== requestEpoch.current) return;

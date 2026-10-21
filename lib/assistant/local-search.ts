@@ -29,6 +29,41 @@ const MAX_SCAN_CHARS = 200_000;
 const MAX_COLLECTION_DOCS = 300;
 
 /**
+ * 只读**校验查询计划需要的元数据**：有哪些课、哪些模块标识。
+ *
+ * `/api/assistant` 先用它校验模型给的过滤条件，再把真正的检索交给 adapter——
+ * 否则一次请求会把整个语料读两遍（实测 route 收一次、adapter 再收一次）。
+ */
+export async function collectPlanContext(query: AssistantQuery): Promise<{
+  lessonNumbers: number[];
+  moduleKeys: string[];
+}> {
+  const store = getAppStore();
+  const projects = await store.listProjects();
+  const scoped =
+    query.scope === "project" && query.projectId
+      ? projects.filter((project) => project.id === query.projectId)
+      : projects;
+  const lessonNumbers = new Set<number>();
+  const moduleKeys = new Set<string>();
+  for (const project of scoped) {
+    const lessons = await store.listLessons(project.id);
+    for (const lesson of lessons) lessonNumbers.add(lesson.lesson_number);
+    const books = (await Promise.all(lessons.map((lesson) => store.listBooksByLesson(lesson.id)))).flat();
+    if (books.length === 0) continue;
+    for (const entry of await store.listModulesByBookIds(books.map((book) => book.id))) {
+      moduleKeys.add(entry.module_key);
+    }
+  }
+  // 知识库集合里的模块标识同样可选
+  for (const row of await listCollectionModules()) moduleKeys.add(row.module.moduleKey);
+  return {
+    lessonNumbers: [...lessonNumbers].sort((a, b) => a - b),
+    moduleKeys: [...moduleKeys].sort(),
+  };
+}
+
+/**
  * 把要搜的东西一次性读出来。
  *
  * 工作区很小（实测一个项目 7 课、58 条来源、66 个版本），直接扫比维护索引省事也更诚实；
@@ -57,7 +92,15 @@ export async function collectCorpora(query: AssistantQuery): Promise<SearchCorpo
     const lessonNumberById = new Map(rows.map((lesson) => [lesson.id, lesson.lesson_number]));
     const moduleById = new Map(modules.map((module) => [module.id, module]));
     const versionRows = await store.listModuleVersions({ moduleIds: modules.map((module) => module.id) });
+    // 每个模块只取**最新版本**：旧版本内容会和最新版重复出现，还可能把已废弃的稿当成当前正文
+    const latestByModule = new Map();
     for (const version of versionRows) {
+      const existing = latestByModule.get(version.module_id);
+      if (!existing || version.version_number > existing.version_number) {
+        latestByModule.set(version.module_id, version);
+      }
+    }
+    for (const version of latestByModule.values()) {
       const moduleRow = moduleById.get(version.module_id);
       if (!moduleRow) continue;
       const markdown = contentToMarkdown(version.content).slice(0, MAX_SCAN_CHARS);
