@@ -351,6 +351,32 @@ async function testJobListIsOcrOnly() {
 }
 
 /**
+ * 刚创建、还没登记进程句柄的任务不能被回收删掉。
+ *
+ * 回归：实测上传大 PDF 后，回收逻辑在"读页数/启动引擎"这段窗口里把任务判成陈旧，
+ * 连刚写进 originals 的原件一起删了，MinerU 于是报 "path does not exist"，
+ * 界面表现为"导入后没反应"。
+ */
+async function testFreshJobSurvivesReconcile() {
+  await withWorkspace(async (root) => {
+    await ensureWorkspace();
+    const original = join(root, "fresh.pdf");
+    writeFileSync(original, "pdf");
+    const job = await createJob({
+      projectId: PROJECT,
+      bookType: "knowledge",
+      originalName: "fresh.pdf",
+      originalPath: original,
+    });
+    // 刚创建：queued、没有 pid、没有上游产物
+    await reconcileOcrJobs(true);
+    const ids = (await listJobs()).map((item) => item.id);
+    assert.equal(ids.includes(job.id), true, "刚创建的任务不能被回收删掉");
+    assert.equal(existsSync(original), true, "刚上传的原件也不能删");
+  });
+}
+
+/**
  * 本进程创建的任务不算"陈旧"：MinerU 退出后还要整理几十秒，
  * 这期间 pid 已经死了，不能把任务判成中断（否则会重复整理或误删）。
  */
@@ -412,9 +438,10 @@ async function testReconcile() {
   await withWorkspace(async () => {
     await ensureWorkspace();
     const failed = await createJob({ projectId: PROJECT, bookType: "student", originalName: "f.pdf", originalPath: "/tmp/f.pdf" });
-    await patchJob(failed.id, { status: "failed", stage: "失败" });
+    // 模拟"上一次运行留下的"任务：持有者是别的进程
+    await patchJob(failed.id, { status: "failed", stage: "失败", ownerPid: 999998 });
     const interrupted = await createJob({ projectId: PROJECT, bookType: "student", originalName: "i.pdf", originalPath: "/tmp/i.pdf" });
-    await patchJob(interrupted.id, { status: "interrupted", stage: "已中断" });
+    await patchJob(interrupted.id, { status: "interrupted", stage: "已中断", ownerPid: 999998 });
 
     await reconcileOcrJobs(true);
     assert.deepEqual((await listJobs()).map((item) => item.id), [], "失败/中断的记录被清掉");
@@ -452,6 +479,7 @@ const tests = [
   ["状态机规则", testStateMachineRules],
   ["OCR 进度解析：页级报页数、区域数只报百分比", testProgressParsing],
   ["识别列表只含 OCR 任务", testJobListIsOcrOnly],
+  ["刚创建的任务不被回收误删（回归）", testFreshJobSurvivesReconcile],
   ["本进程持有的任务不判陈旧", testOwnedJobIsNotStale],
   ["删除任务：进程/产物/记录/原件一起清", testDeleteJobCleansEverything],
   ["共用的原件不删", testDeleteKeepsSharedOriginal],

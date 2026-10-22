@@ -306,6 +306,9 @@ export async function reconcileOcrJobs(force = false): Promise<void> {
 
   const records = await listJobs();
   for (const record of records) {
+    // 本进程创建的任务由本进程负责：它可能刚建好、正在读页数/启动引擎，
+    // 此时没有 pid 也没有句柄——不能当成"陈旧"删掉（实测会把刚上传的原件一起删）。
+    if (record.ownerPid === process.pid) continue;
     if (running.has(record.id) || resuming.has(record.id)) continue;
 
     if (record.status === "failed" || record.status === "interrupted" || record.status === "cancelled") {
