@@ -482,26 +482,32 @@ async function testRelatedContentLoader() {
 /**
  * 工作区默认项目：老师不需要选项目。
  *
- * 空工作区自动建一个；**已有历史项目就沿用它**（绝不因为"没选项目"另起一个，
- * 否则历史来源与版本会散在两个项目里）。
+ * 空工作区自动建一个；**已有历史项目就沿用它**。学期是隔离维度：
+ * 不同学期的 Lesson 编号都从 1 开始，挤在一个项目里会互相覆盖。
  */
 async function testWorkspaceProjectIsImplicit() {
-  // 1) 空工作区：自动建一个
+  // 1) 空工作区：按学期建；同学期再取是同一个
   await withWorkspace(async () => {
-    const first = await workspaceProject();
-    assert.equal(first.name, "我的教材");
-    assert.equal(first.grade, "L5");
-    const again = await workspaceProject();
-    assert.equal(again.id, first.id, "再取一次是同一个，不重复创建");
-    assert.equal((await store().listProjects()).length, 1);
+    const spring = await workspaceProject({ term: "spring", grade: "L5" });
+    assert.equal(spring.term, "spring");
+    assert.match(spring.name, /春季/u);
+    assert.equal((await workspaceProject({ term: "spring", grade: "L5" })).id, spring.id);
+
+    // 2) 不同学期是不同项目
+    const winter = await workspaceProject({ term: "winter", grade: "L5" });
+    assert.notEqual(winter.id, spring.id);
+    assert.equal(winter.term, "winter");
+
+    // 3) 不给条件：取最早创建的那个（识别侧用这条）
+    assert.equal((await workspaceProject()).id, spring.id);
+    assert.equal((await store().listProjects()).length, 2);
   });
 
-  // 2) 已有历史项目：沿用它，不新建
+  // 4) 已有历史项目：沿用它，不新建
   await withWorkspace(async () => {
     const s = store();
     const historical = await s.insertProject({ name: "冬季教材迁移", grade: "L5", term: "winter" });
-    const picked = await workspaceProject();
-    assert.equal(picked.id, historical.id, "历史项目优先");
+    assert.equal((await workspaceProject({ term: "winter", grade: "L5" })).id, historical.id);
     assert.equal((await s.listProjects()).length, 1, "不能另起一个项目");
   });
 }

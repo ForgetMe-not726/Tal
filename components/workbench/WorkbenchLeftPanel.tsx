@@ -13,7 +13,8 @@ import { sourceUnitForTargetLesson } from "@/lib/knowledge/legacy-markdown";
 import { plateLetter, plateTone } from "@/lib/mock";
 import { BOOK_TYPES, LEVELS } from "@/lib/mock";
 import { cn } from "@/lib/utils";
-import type { AiDiagnosticsView, BookTypeId, GeneratedBlock, LessonType, Level, ModuleDef, OutlineLessonProfile, OutlineProfile } from "@/lib/types";
+import type { AiDiagnosticsView, BookTypeId, GeneratedBlock, LessonType, Level, ModuleDef, OutlineLessonProfile, OutlineProfile, Term } from "@/lib/types";
+import { TERM_LABEL, TERMS } from "@/lib/types";
 
 const LESSON_TYPES: Array<{ id: LessonType; label: string }> = [
   { id: "regular", label: "常规课" },
@@ -30,6 +31,8 @@ function sourceUnitLabel(lesson: OutlineLessonProfile): string {
 
 interface Props {
   level: Level;
+  term: Term;
+  onTermChange: (term: Term) => void;
   lessonNumber: number;
   lessonTitle: string;
   bookType: BookTypeId;
@@ -62,6 +65,8 @@ interface Props {
 
 export function WorkbenchLeftPanel({
   level,
+  term,
+  onTermChange,
   lessonNumber,
   lessonTitle,
   bookType,
@@ -186,6 +191,16 @@ export function WorkbenchLeftPanel({
             </>
           )}
         </section>
+
+        <div className="grid grid-cols-[56px_1fr] items-center gap-2">
+          <label htmlFor="term" className="text-xs font-medium text-ink-2">学期</label>
+          <Select value={term} onValueChange={(value) => onTermChange(value as Term)}>
+            <SelectTrigger id="term" className="h-8 w-full"><SelectValue placeholder="选择学期" /></SelectTrigger>
+            <SelectContent>
+              {TERMS.map((item) => <SelectItem key={item} value={item}>{TERM_LABEL[item]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
 
         <div className="grid grid-cols-[56px_1fr] items-center gap-2">
           <label htmlFor="level" className="text-xs font-medium text-ink-2">年级</label>

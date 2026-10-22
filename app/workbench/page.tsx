@@ -18,17 +18,15 @@ import { missingSourceMessage, selectSourceText } from "@/lib/knowledge/source-s
 import { BOOK_TYPES, plateLetter, plateTone } from "@/lib/mock";
 import { moduleOrdinal } from "@/lib/markdown/heading-levels";
 import { applySuggestionToMarkdown, type ApplyFailureReason } from "@/lib/suggestions/apply";
-import type { AiDiagnosticsView, BlockCheck, ContentSuggestion, BookTypeId, ExportFormat, GeneratedBlock, LegacyLessonPackage, LegacySectionKey, LessonType, Level, ModuleDef, ModuleVersionSummary, OutlineLessonProfile, OutlineProfile, WorkbenchSuggestion } from "@/lib/types";
+import { TERM_LABEL } from "@/lib/types";
+import type { AiDiagnosticsView, BlockCheck, ContentSuggestion, BookTypeId, ExportFormat, GeneratedBlock, LegacyLessonPackage, LegacySectionKey, LessonType, Level, ModuleDef, ModuleVersionSummary, OutlineLessonProfile, OutlineProfile, Term, WorkbenchSuggestion } from "@/lib/types";
 
-const TERM = "winter";
 /**
  * 项目名不再是常量。
  *
- * 此前写死成"冬季教材迁移 MVP"，而「资料识别」页有自己的项目选择——
- * 两边对不上就选不到刚识别完的来源，版本也会落到另一个项目里。
- * 这里改成从工作区读项目列表，默认沿用原来的名字（迁移前后行为一致）。
+ * 名字由服务端按学期/年级给；项目还没取回来时用同样的规则拼一个，
+ * 不能退回某个写死的名字——那会把春季的课时写进冬季项目。
  */
-const DEFAULT_PROJECT_NAME = "冬季教材迁移 MVP";
 
 type GenerationResponse = {
   markdown: string;
@@ -98,6 +96,8 @@ function toModuleDefs(definitions: ResolvedModule[]): ModuleDef[] {
 
 export default function WorkbenchPage() {
   const [level, setLevel] = React.useState<Level>("L5");
+  /** 学期：项目按学期隔离（不同学期的 Lesson 编号都从 1 开始）。 */
+  const [term, setTerm] = React.useState<Term>("winter");
   const [bookType, setBookType] = React.useState<BookTypeId>("knowledge");
   const [lessonType, setLessonType] = React.useState<LessonType>("regular");
   const [lessonNumber, setLessonNumber] = React.useState(1);
@@ -126,7 +126,8 @@ export default function WorkbenchPage() {
   const [projects, setProjects] = React.useState<Array<{ id: string; name: string; grade: string; term: string }>>([]);
   const [projectId, setProjectId] = React.useState("");
   const [ocrSources, setOcrSources] = React.useState<Array<{ jobId: string; originalName: string; pageCount: number }>>([]);
-  const projectName = projects.find((item) => item.id === projectId)?.name ?? DEFAULT_PROJECT_NAME;
+  const projectName =
+    projects.find((item) => item.id === projectId)?.name ?? `${level} ${TERM_LABEL[term]} 教材`;
   // 换了项目但新列表还没回来时，不要把上一个项目的来源显示出来
   const visibleOcrSources = projectId ? ocrSources : [];
   const requestEpoch = React.useRef(0);
@@ -217,11 +218,15 @@ export default function WorkbenchPage() {
     };
   }, [activeBlock?.moduleId, versionHistoryEpoch]);
 
-  // 默认项目：老师不需要选项目。**由服务端给**，与识别侧用同一条规则
-  // （最早创建的那个）——按列表顺序猜会落到另一个项目，课时和版本就分家了。
+  // 默认项目：老师不需要选项目。**由服务端按学期/年级给**——不同学期的 Lesson
+  // 编号都从 1 开始，共用一个项目会互相覆盖（春季 Lesson 1 会把寒假 Lesson 1 改名）。
+  // 不传条件时服务端返回最早创建的项目，识别侧仍用那一个。
   React.useEffect(() => {
     let active = true;
-    void fetch("/api/projects/default", { cache: "no-store" })
+    void fetch(
+      `/api/projects/default?term=${encodeURIComponent(term)}&grade=${encodeURIComponent(level)}`,
+      { cache: "no-store" },
+    )
       .then(async (response) => {
         const data = (await response.json()) as {
           project?: { id: string; name: string; grade: string; term: string };
@@ -230,13 +235,13 @@ export default function WorkbenchPage() {
         if (!response.ok) throw new Error(data.error ?? "默认项目加载失败");
         if (!active || !data.project) return;
         setProjects([data.project]);
-        setProjectId((current) => current || data.project!.id);
+        setProjectId(data.project.id);
       })
       .catch(() => undefined);
     return () => {
       active = false;
     };
-  }, []);
+  }, [term, level]);
 
   // 本项目、本书种下**已确认**的 OCR 来源（资料识别页确认过的）
   React.useEffect(() => {
@@ -472,7 +477,7 @@ export default function WorkbenchPage() {
         projectName,
         projectId: projectId || undefined,
         grade: level,
-        term: TERM,
+        term,
         lessonNumber,
         lessonTitle,
         bookType,
@@ -617,7 +622,7 @@ export default function WorkbenchPage() {
             projectId: requestContext.contextIds.projectId,
             lessonId: requestContext.contextIds.lessonId,
             grade: requestContext.level,
-            term: TERM,
+            term,
             lessonNumber: requestContext.lessonNumber,
             lessonTitle: requestContext.lessonTitle,
             bookType: requestContext.bookType,
@@ -793,6 +798,15 @@ export default function WorkbenchPage() {
     <div className="flex h-screen min-w-0 flex-1">
       <WorkbenchLeftPanel
         level={level}
+        term={term}
+        onTermChange={(next) => {
+          if (saving || next === term) return;
+          resetDocument();
+          // 先清空项目：否则取新项目回来之前生成，会带着旧项目名写进新学期
+          setProjects([]);
+          setProjectId("");
+          setTerm(next);
+        }}
         lessonNumber={lessonNumber}
         lessonTitle={lessonTitle}
         bookType={bookType}

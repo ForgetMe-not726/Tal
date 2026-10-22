@@ -1,5 +1,18 @@
 export type Level = "L1" | "L2" | "L3" | "L4" | "L5" | "L6";
 
+/**
+ * 学期。项目按**学期**隔离：不同学期的 Lesson 编号都是从 1 开始，
+ * 放在同一个项目里会互相覆盖（春季 Lesson 1 会把寒假 Lesson 1 改名并混入版本）。
+ */
+export const TERMS = ["winter", "spring", "summer", "autumn"] as const;
+export type Term = (typeof TERMS)[number];
+export const TERM_LABEL: Record<Term, string> = {
+  winter: "寒假",
+  spring: "春季",
+  summer: "暑假",
+  autumn: "秋季",
+};
+
 export type {
   OutlineLessonProfile,
   OutlineMappingProjection,
