@@ -217,20 +217,20 @@ export default function WorkbenchPage() {
     };
   }, [activeBlock?.moduleId, versionHistoryEpoch]);
 
-  // 项目列表：与「资料识别」页共用（本地工作区里的项目）
+  // 默认项目：老师不需要选项目。**由服务端给**，与识别侧用同一条规则
+  // （最早创建的那个）——按列表顺序猜会落到另一个项目，课时和版本就分家了。
   React.useEffect(() => {
     let active = true;
-    void fetch("/api/projects", { cache: "no-store" })
+    void fetch("/api/projects/default", { cache: "no-store" })
       .then(async (response) => {
         const data = (await response.json()) as {
-          projects?: Array<{ id: string; name: string; grade: string; term: string }>;
+          project?: { id: string; name: string; grade: string; term: string };
           error?: string;
         };
-        if (!response.ok) throw new Error(data.error ?? "项目列表加载失败");
-        if (!active) return;
-        const list = data.projects ?? [];
-        setProjects(list);
-        setProjectId((current) => current || list[0]?.id || "");
+        if (!response.ok) throw new Error(data.error ?? "默认项目加载失败");
+        if (!active || !data.project) return;
+        setProjects([data.project]);
+        setProjectId((current) => current || data.project!.id);
       })
       .catch(() => undefined);
     return () => {
