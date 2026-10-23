@@ -8,7 +8,8 @@ import { splitLegacyMarkdown } from "@/lib/knowledge/legacy-source";
 import type { LegacyLessonPackage } from "@/lib/knowledge/legacy-markdown";
 import type { OcrPage, OcrStructure } from "@/lib/ocr/types";
 import type { OcrJobView } from "@/lib/ocr/jobs";
-import type { BookTypeId } from "@/lib/types";
+import type { BookTypeId, Term } from "@/lib/types";
+import { detectTerm } from "@/lib/ocr/naming";
 
 type JobDetail = { job: OcrJobView };
 
@@ -24,6 +25,10 @@ const POLL_MS = 3000;
 
 export default function RecognizePage() {
   const [bookType, setBookType] = React.useState<BookTypeId>("knowledge");
+  // 学期只影响资料库文件夹名（spring-sb-ocr）；导入时按文件名自动认，老师可改。
+  // 老师手动选过就不再被文件名覆盖（"2021 春1" 的文件名也可能放错）。
+  const [term, setTerm] = React.useState<Term>("winter");
+  const termTouched = React.useRef(false);
   const [jobs, setJobs] = React.useState<OcrJobView[]>([]);
   const [engine, setEngine] = React.useState<{ ready: boolean; reason?: string }>({ ready: false });
   const [selectedJobId, setSelectedJobId] = React.useState<string | null>(null);
@@ -170,7 +175,10 @@ export default function RecognizePage() {
   async function handleUploadFile(file: File) {
     setUploading(true);
     try {
-      const query = new URLSearchParams({ bookType, fileName: file.name });
+      const detected = detectTerm(file.name);
+      const chosen = termTouched.current || !detected ? term : detected;
+      if (chosen !== term) setTerm(chosen);
+      const query = new URLSearchParams({ bookType, fileName: file.name, term: chosen });
       const response = await fetch(`/api/ocr?${query.toString()}`, {
         method: "POST",
         headers: { "content-type": "application/octet-stream" },
@@ -193,7 +201,7 @@ export default function RecognizePage() {
       const response = await fetch("/api/ocr", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ bookType, upstreamDir }),
+        body: JSON.stringify({ bookType, upstreamDir, term }),
       });
       const data = (await response.json()) as { job?: OcrJobView; error?: string };
       if (!response.ok) throw new Error(data.error ?? "导入失败");
@@ -265,6 +273,11 @@ export default function RecognizePage() {
   return (
     <div className="flex h-screen min-w-0 flex-1">
       <RecognizeLeftPanel
+        term={term}
+        onTermChange={(next) => {
+          termTouched.current = true;
+          setTerm(next);
+        }}
         bookType={bookType}
         onBookTypeChange={setBookType}
         jobs={jobs}

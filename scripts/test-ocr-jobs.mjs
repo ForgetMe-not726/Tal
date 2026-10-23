@@ -22,7 +22,8 @@ import {
 import { resolveInWorkspace, WorkspaceFileError } from "../lib/workspace/files.ts";
 import { parseProgress } from "../lib/ocr/mineru.ts";
 import { ensureWorkspace } from "../lib/workspace/bootstrap.ts";
-import { jobsDir, ocrJobDir, ocrUpstreamDir } from "../lib/workspace/paths.ts";
+import { jobFile, jobsDir, legacyOcrJobDir, ocrJobDir, ocrLibraryDir, ocrUpstreamDir } from "../lib/workspace/paths.ts";
+import { migrateLegacyOcrLibrary } from "../lib/ocr/library.ts";
 import { deleteJob } from "../lib/ocr/jobs.ts";
 import { reconcileOcrJobs } from "../lib/ocr/service.ts";
 
@@ -145,8 +146,9 @@ async function testNormalizeWritesContractFiles() {
       "缺 origin.pdf 要留提醒",
     );
 
-    const jobDir = ocrJobDir(PROJECT, job.id);
-    const markdown = await readContent(PROJECT, job.id);
+    const jobDir = ocrJobDir(job.dirName ?? job.id);
+    assert.match(job.dirName ?? "", /^winter-kl-ocr/u, "资料库文件夹用可读英文名");
+    const markdown = await readContent(job.id);
     assert.match(markdown, /^<!-- page 0 -->/m);
     // 正文自己写了课号标题（`# 第1讲 知识清单`）→ 不再补一个，也不重复
     assert.match(markdown, /^# 第1讲 知识清单$/m);
@@ -196,20 +198,20 @@ async function testConfirmFlow() {
     // 待核对：不出现在"已确认来源"里
     assert.deepEqual(await listConfirmedSources({ projectId: PROJECT }), []);
 
-    await saveContent(PROJECT, job.id, "# 改过的正文\n");
-    assert.equal(await readContent(PROJECT, job.id), "# 改过的正文\n");
+    await saveContent(job.id, "# 改过的正文\n");
+    assert.equal(await readContent(job.id), "# 改过的正文\n");
 
-    const confirmed = await confirmJob({ projectId: PROJECT, jobId: job.id });
+    const confirmed = await confirmJob({ jobId: job.id });
     assert.equal(confirmed.status, "confirmed");
     assert.equal(confirmed.confirmedBy, "teacher");
     assert.equal(typeof confirmed.confirmedAt, "string");
 
     // 幂等
-    const again = await confirmJob({ projectId: PROJECT, jobId: job.id });
+    const again = await confirmJob({ jobId: job.id });
     assert.equal(again.confirmedAt, confirmed.confirmedAt);
 
     // 已确认不能再改正文
-    await assert.rejects(() => saveContent(PROJECT, job.id, "又改"), /不能再改/);
+    await assert.rejects(() => saveContent(job.id, "又改"), /不能再改/);
 
     // 已确认来源按书种过滤
     const sources = await listConfirmedSources({ projectId: PROJECT, bookType: "knowledge" });
@@ -407,14 +409,14 @@ async function testDeleteJobCleansEverything() {
       originalName: "a.pdf",
       originalPath: original,
     });
-    mkdirSync(ocrJobDir(PROJECT, job.id), { recursive: true });
+    mkdirSync(ocrJobDir(job.dirName ?? job.id), { recursive: true });
     mkdirSync(ocrUpstreamDir(job.id), { recursive: true });
     await patchJob(job.id, { upstreamDir: ocrUpstreamDir(job.id) });
 
-    assert.equal(existsSync(ocrJobDir(PROJECT, job.id)), true);
+    assert.equal(existsSync(ocrJobDir(job.dirName ?? job.id)), true);
     await deleteJob(job.id, "测试清理");
     assert.deepEqual(await listJobs(), [], "记录已删");
-    assert.equal(existsSync(ocrJobDir(PROJECT, job.id)), false, "识别产物已删");
+    assert.equal(existsSync(ocrJobDir(job.dirName ?? job.id)), false, "识别产物已删");
     assert.equal(existsSync(ocrUpstreamDir(job.id)), false, "上游临时产物已删");
     assert.equal(existsSync(original), false, "没有别的任务用这份原件，原件也删");
   });
@@ -470,6 +472,100 @@ async function testReconcile() {
   });
 }
 
+/** 资料库文件夹名：学期 + 书种缩写，重名自动加序号。 */
+async function testLibraryFolderNames() {
+  await withWorkspace(async (root) => {
+    await ensureWorkspace();
+    const first = await createJob({
+      projectId: PROJECT,
+      bookType: "student",
+      originalName: "2021 春1 学生用书.pdf",
+      originalPath: join(root, "a.pdf"),
+    });
+    assert.equal(first.term, "spring", "学期从文件名认出来");
+    assert.equal(first.dirName, "spring-sb-ocr");
+    assert.equal(existsSync(ocrLibraryDir()), true, "资料库目录在调用时自动建好");
+
+    const second = await createJob({
+      projectId: PROJECT,
+      bookType: "student",
+      originalName: "2021 春1 学生用书.pdf",
+      originalPath: join(root, "b.pdf"),
+    });
+    assert.equal(second.dirName, "spring-sb-ocr-2", "重名加序号，不覆盖已有结果");
+
+    const knowledge = await createJob({
+      projectId: PROJECT,
+      bookType: "knowledge",
+      originalName: "寒假知识清单.pdf",
+      originalPath: join(root, "c.pdf"),
+    });
+    assert.equal(knowledge.dirName, "winter-kl-ocr");
+
+    const explicit = await createJob({
+      projectId: PROJECT,
+      bookType: "workbook",
+      originalName: "寒假练习册.pdf",
+      originalPath: join(root, "d.pdf"),
+      term: "autumn",
+    });
+    assert.equal(explicit.dirName, "autumn-wb-ocr", "老师选的学期优先于文件名");
+  });
+}
+
+/** 旧位置（projects/<id>/sources/ocr/<job-id>）迁移到可读文件夹。 */
+async function testLegacyLibraryMigration() {
+  await withWorkspace(async () => {
+    await ensureWorkspace();
+    const id = "legacy-1";
+    const now = new Date().toISOString();
+    const legacy = legacyOcrJobDir(PROJECT, id);
+    mkdirSync(legacy, { recursive: true });
+    writeFileSync(join(legacy, "content.md"), "# 旧结果" + String.fromCharCode(10));
+    writeFileSync(
+      join(legacy, "manifest.json"),
+      JSON.stringify({
+        jobId: id,
+        projectId: PROJECT,
+        bookType: "student",
+        originalName: "寒假学生用书.pdf",
+        originalBytes: 0,
+        status: "confirmed",
+        engine: { name: "MinerU", version: "3.4.5", backend: "pipeline", method: "ocr", language: "ch" },
+        pageCount: 3,
+        pages: { format: "jpeg", dpi: 144 },
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    writeFileSync(
+      jobFile(id),
+      JSON.stringify({
+        id,
+        projectId: PROJECT,
+        bookType: "student",
+        status: "ready",
+        originalPath: "x.pdf",
+        originalName: "寒假学生用书.pdf",
+        stage: "待核对",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+
+    await migrateLegacyOcrLibrary();
+    const record = await readJob(id);
+    assert.equal(record.dirName, "winter-sb-ocr");
+    assert.equal(existsSync(join(ocrJobDir("winter-sb-ocr"), "content.md")), true, "产物跟着搬过去");
+    assert.equal(existsSync(legacy), false, "旧目录不留副本");
+    const manifest = await readManifest(id);
+    assert.equal(manifest.dirName, "winter-sb-ocr", "manifest 补上文件夹名");
+
+    await migrateLegacyOcrLibrary();
+    assert.equal((await readJob(id)).dirName, "winter-sb-ocr", "重复迁移不改名");
+  });
+}
+
 const tests = [
   ["任务读写与列表", testJobRoundTrip],
   ["陈旧任务恢复（回归）", testStaleJobIsRepaired],
@@ -486,6 +582,8 @@ const tests = [
   ["回收：清失败记录、上限 10 条", testReconcile],
   ["路径逃逸被拒", testPathEscapeIsRejected],
   ["原件复制进工作区且不改源文件", testStoreOriginal],
+  ["资料库文件夹名可读且不重名", testLibraryFolderNames],
+  ["旧 UUID 目录迁移到资料库", testLegacyLibraryMigration],
 ];
 
 for (const [name, test] of tests) {

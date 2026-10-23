@@ -10,6 +10,7 @@ import {
   listJobViews,
 } from "@/lib/ocr/jobs";
 import { engineStatus, reconcileOcrJobs, startImport, startRecognition } from "@/lib/ocr/service";
+import { detectTerm, normalizeTerm } from "@/lib/ocr/naming";
 import { OcrError } from "@/lib/ocr/types";
 
 export const runtime = "nodejs";
@@ -32,10 +33,15 @@ export async function POST(request: Request) {
 
     if (contentType.includes("application/json")) {
       const body = (await request.json()) as Record<string, unknown>;
-      // 老师不需要选项目：不给就用工作区默认项目
-      const projectId = String(body.projectId ?? "").trim() || (await workspaceProject()).id;
+      const term =
+        normalizeTerm(body.term) ??
+        detectTerm(typeof body.originalName === "string" ? body.originalName : "") ??
+        undefined;
+      // 老师不需要选项目：不给就用该学期的默认项目（资料库文件夹按学期命名）
+      const projectId = String(body.projectId ?? "").trim() || (await workspaceProject({ term })).id;
       const job = await startImport({
         projectId,
+        term: term ?? undefined,
         bookType: assertBookType(body.bookType),
         upstreamDir: String(body.upstreamDir ?? "").trim(),
         originalPath: typeof body.originalPath === "string" ? body.originalPath : undefined,
@@ -46,10 +52,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ job }, { status: 201 });
     }
 
-    const project = await workspaceProject();
+    const originalName = assertImportable(url.searchParams.get("fileName") ?? "");
+    // 学期决定资料库文件夹名（spring-sb-ocr）：老师选的优先，没选就认文件名
+    const term = normalizeTerm(url.searchParams.get("term")) ?? detectTerm(originalName) ?? undefined;
+    const project = await workspaceProject({ term });
     const projectId = project.id;
     const bookType = assertBookType(url.searchParams.get("bookType"));
-    const originalName = assertImportable(url.searchParams.get("fileName") ?? "");
     if (!request.body) throw new OcrError("请求体为空，没有收到文件");
 
     const ready = await engineStatus();
@@ -75,6 +83,7 @@ export async function POST(request: Request) {
       originalName,
       originalPath: target,
       originalBytes: bytes,
+      term,
     });
     return NextResponse.json({ job, bytes }, { status: 201 });
   } catch (error) {

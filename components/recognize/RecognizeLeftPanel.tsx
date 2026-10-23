@@ -3,12 +3,16 @@
 import * as React from "react";
 import { Loader2, Upload } from "lucide-react";
 import { BOOK_TYPES } from "@/lib/mock";
-import type { BookTypeId } from "@/lib/types";
+import { TERM_LABEL, TERMS } from "@/lib/types";
+import type { BookTypeId, Term } from "@/lib/types";
 import type { OcrJobView } from "@/lib/ocr/jobs";
 import type { OcrJobStatus } from "@/lib/ocr/types";
 import { cn } from "@/lib/utils";
 
 export type RecognizeLeftPanelProps = {
+  /** 学期只用于资料库文件夹命名（spring-sb-ocr），不改变解析规则。 */
+  term: Term;
+  onTermChange: (term: Term) => void;
   bookType: BookTypeId;
   onBookTypeChange: (bookType: BookTypeId) => void;
   jobs: OcrJobView[];
@@ -54,6 +58,8 @@ export function jobStatusOf(job: OcrJobView): OcrJobStatus {
 }
 
 export function RecognizeLeftPanel({
+  term,
+  onTermChange,
   bookType,
   onBookTypeChange,
   jobs,
@@ -81,8 +87,23 @@ export function RecognizeLeftPanel({
       </div>
 
       <div className="flex flex-col gap-2.5 px-3 py-3">
-        {/* 书种决定用哪个解析器切课，导入时就要定 */}
+        {/* 学期 + 书种决定资料库文件夹名：spring-sb-ocr */}
         <section className="space-y-1.5 rounded-md border border-line bg-canvas/40 p-2.5">
+          <label htmlFor="term" className="block text-xs font-medium text-ink-2">
+            学期
+          </label>
+          <select
+            id="term"
+            value={term}
+            onChange={(event) => onTermChange(event.target.value as Term)}
+            className="h-8 w-full rounded-md border border-line bg-paper px-2 text-xs text-ink outline-none focus:border-brand"
+          >
+            {TERMS.map((item) => (
+              <option key={item} value={item}>
+                {TERM_LABEL[item]}
+              </option>
+            ))}
+          </select>
           <label htmlFor="bookType" className="block text-xs font-medium text-ink-2">
             书种
           </label>
@@ -99,7 +120,9 @@ export function RecognizeLeftPanel({
             ))}
           </select>
           <p className="text-[10px] leading-relaxed text-ink-3">
-            书种决定用哪套栏目规则切分，导入后不再改。
+            书种决定用哪套栏目规则切分，导入后不再改。识别结果存到资料库文件夹
+            <code className="mx-0.5 rounded bg-canvas px-1">{`${term}-sb-ocr`}</code>
+            这样的名字里（书种缩写 sb/wb/kl/vocab），重名自动加序号。
           </p>
         </section>
 
@@ -192,6 +215,12 @@ export function RecognizeLeftPanel({
                       : job.pagesTotal != null
                         ? `${job.pagesTotal} 页`
                         : job.stage}
+                    {job.dirName && (
+                      <>
+                        {" · "}
+                        <span className="font-mono">{job.dirName}</span>
+                      </>
+                    )}
                   </span>
                   {job.message && (
                     <span className="mt-0.5 block text-[10px] leading-relaxed text-amber-800">

@@ -46,7 +46,7 @@ source page
 
 ## 已落地的 adapter（2026-09-29）
 
-`lib/ocr/` 是唯一调用外部进程的地方，业务层只读 `sources/ocr/<job>/` 下那几个文件。
+`lib/ocr/` 是唯一调用外部进程的地方，业务层只读 `sources/ocr/<学期>-<书种>-ocr/`（如 `spring-sb-ocr`）下那几个文件。
 
 实测命令（MinerU 3.4.5，本机 venv）：
 

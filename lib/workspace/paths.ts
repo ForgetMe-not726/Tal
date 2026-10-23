@@ -14,10 +14,10 @@
  *   knowledge/                         参考资料（剑桥等），随包分发基线
  *     entries.json  cambridge/  other/
  *   module-definitions.json            模块目录（canonical）
+ *   sources/ocr/<学期>-<书种>-ocr/        资料库：OCR 产物（老师直接打开就能看懂）
  *   projects/<project-id>/
  *     project.json
- *     sources/originals/<原文件>        原始 PDF / 图片，只复制不改写
- *     sources/ocr/<job-id>/             OCR 产物：manifest / content.md / structure.json / pages / assets
+ *     sources/originals/<原文件>           原始 PDF / 图片，只复制不改写
  *     lessons/<lesson-key>/
  *       lesson.json  sources.json  context.json
  *       books/<book-type>/<module-key>/module.json  versions/<n>.json
@@ -172,26 +172,37 @@ export function reviewJobDir(projectId: string, lessonNumber: number, jobId: str
 }
 
 /**
- * 原始资料与 OCR 产物。
+ * 资料库：工作区顶层的 `sources/`。
  *
- * 原件只复制不改写；OCR 产物是**候选来源**，老师确认后才进 Production Source
- * （profile §5.1、`docs/drafts/知识-数据-规则系统-方案.md` §2）。
+ * 识别结果不放在 `projects/<UUID>/` 下面——老师要在资源管理器里直接找到它，
+ * 项目序号对人是噪音。文件夹用 `<学期>-<书种>-ocr`（如 `spring-sb-ocr`），
+ * 重名自动加序号，不覆盖已有结果。
  */
-export function sourcesDir(projectId: string): string {
-  return join(projectDir(projectId), SOURCES_DIR);
+export function libraryDir(): string {
+  return join(workspaceRoot(), SOURCES_DIR);
 }
 
 /** 原始 PDF / 图片，只复制不改写。 */
 export function originalsDir(projectId: string): string {
-  return join(sourcesDir(projectId), ORIGINALS_DIR);
+  return join(projectDir(projectId), SOURCES_DIR, ORIGINALS_DIR);
 }
 
-export function ocrDir(projectId: string): string {
-  return join(sourcesDir(projectId), OCR_DIR);
+export function ocrLibraryDir(): string {
+  return join(libraryDir(), OCR_DIR);
 }
 
-export function ocrJobDir(projectId: string, jobId: string): string {
-  return join(ocrDir(projectId), safeSegment(jobId));
+/** 资料库里的一个识别结果目录（参数是文件夹名，不是任务 id）。 */
+export function ocrJobDir(dirName: string): string {
+  return join(ocrLibraryDir(), safeSegment(dirName));
+}
+
+/** 2026-10-23 之前的位置（`projects/<id>/sources/ocr/<job-id>`），只用于迁移。 */
+export function legacyOcrDir(projectId: string): string {
+  return join(projectDir(projectId), SOURCES_DIR, OCR_DIR);
+}
+
+export function legacyOcrJobDir(projectId: string, jobId: string): string {
+  return join(legacyOcrDir(projectId), safeSegment(jobId));
 }
 
 /** 在跑任务的状态文件（可重建，不是事实源）。 */

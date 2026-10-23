@@ -13,7 +13,9 @@ import { appendFile, mkdir, readFile, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { copyDirFiles, copyIntoWorkspace, readBinary, writeBinaryAtomic } from "../workspace/files.ts";
 import { listDir, readJson, readJsonDir, updateJson, writeJson } from "../workspace/json.ts";
-import { jobFile, jobsDir, ocrDir, ocrFailureLog, ocrJobDir, originalsDir, safeSegment } from "../workspace/paths.ts";
+import { jobFile, jobsDir, legacyOcrDir, legacyOcrJobDir, ocrFailureLog, ocrJobDir, ocrLibraryDir, originalsDir, safeSegment } from "../workspace/paths.ts";
+import { allocateLibraryDirName, detectTerm, normalizeTerm } from "./naming.ts";
+import { createLibraryDir, existingLibraryDirNames } from "./naming-disk.ts";
 import { cancelProcessTree, isProcessAlive, mineruPython } from "./mineru.ts";
 import { countPdfPages } from "./pages.ts";
 import {
@@ -74,12 +76,19 @@ export async function createJob(input: {
   bookType: BookType;
   originalName: string;
   originalPath: string;
+  /** 老师选的学期；没给就从文件名认，认不出用 winter。 */
+  term?: string;
 }): Promise<OcrJobRecord> {
   const now = new Date().toISOString();
+  const term = normalizeTerm(input.term) ?? detectTerm(input.originalName) ?? "winter";
+  // 文件夹随任务一起建出来：老师导入后就能在资料库里看到位置；失败时连目录一起清掉
+  const dirName = await createLibraryDir(term, input.bookType);
   const record: OcrJobRecord = {
     id: randomUUID(),
     projectId: input.projectId,
     bookType: input.bookType,
+    term,
+    dirName,
     status: "queued",
     originalPath: input.originalPath,
     originalName: input.originalName,
@@ -92,6 +101,15 @@ export async function createJob(input: {
   };
   await writeJson(jobFile(record.id), record);
   return record;
+}
+
+/** 给还没有资料库文件夹名的旧记录补一个（恢复中的任务在整理前调用）。 */
+export async function ensureJobLibraryDir(record: OcrJobRecord): Promise<OcrJobRecord> {
+  if (record.dirName) return record;
+  const term = normalizeTerm(record.term) ?? detectTerm(record.originalName) ?? "winter";
+  const dirName = await allocateLibraryDirName(term, record.bookType, await existingLibraryDirNames());
+  await mkdir(ocrJobDir(dirName), { recursive: true });
+  return patchJob(record.id, { term, dirName });
 }
 
 export async function readJob(jobId: string): Promise<OcrJobRecord> {
@@ -216,7 +234,9 @@ export async function deleteJob(jobId: string, reason: string): Promise<void> {
   }
 
   // 3) 产物：识别结果 + 上游临时产物
-  await rm(ocrJobDir(record.projectId, jobId), { recursive: true, force: true }).catch(() => undefined);
+  await rm(ocrJobDir(record.dirName ?? jobId), { recursive: true, force: true }).catch(() => undefined);
+  // 迁移前的老位置也清掉（还没迁移的任务，产物仍在 UUID 目录里）
+  await rm(legacyOcrJobDir(record.projectId, jobId), { recursive: true, force: true }).catch(() => undefined);
   if (record.upstreamDir) {
     await rm(record.upstreamDir, { recursive: true, force: true }).catch(() => undefined);
   }
@@ -272,7 +292,7 @@ export async function normalizeIntoWorkspace(input: {
   /** 上游日志尾部，写进 diagnostics 供事后排查。 */
   logTail?: string[];
 }): Promise<NormalizeResult> {
-  const jobDir = ocrJobDir(input.job.projectId, input.job.id);
+  const jobDir = ocrJobDir(input.job.dirName ?? input.job.id);
   const structure = buildStructure({
     jobId: input.job.id,
     contentList: input.contentList,
@@ -308,6 +328,8 @@ export async function normalizeIntoWorkspace(input: {
     jobId: input.job.id,
     projectId: input.job.projectId,
     bookType: input.job.bookType,
+    term: input.job.term,
+    dirName: input.job.dirName,
     originalName: input.job.originalName,
     originalBytes: 0,
     status: "ready",
@@ -340,32 +362,36 @@ export async function normalizeIntoWorkspace(input: {
 // 读取与确认
 // ---------------------------------------------------------------------------
 
-export async function readManifest(projectId: string, jobId: string): Promise<OcrManifest> {
+/** 产物目录由任务记录决定（资料库文件夹名），不再由项目目录拼出来。 */
+export async function jobDirOf(jobId: string): Promise<string> {
+  const record = await readJob(jobId);
+  return ocrJobDir(record.dirName ?? record.id);
+}
+
+export async function readManifest(jobId: string): Promise<OcrManifest> {
   const manifest = await readJson<OcrManifest | null>(
-    join(ocrJobDir(projectId, jobId), "manifest.json"),
+    join(await jobDirOf(jobId), "manifest.json"),
     null,
   );
   if (!manifest) throw new OcrError(`任务 ${jobId} 还没有产物`);
   return manifest;
 }
 
-export async function readContent(projectId: string, jobId: string): Promise<string> {
-  const buffer = await readBinary(join(ocrJobDir(projectId, jobId), "content.md"));
+export async function readContent(jobId: string): Promise<string> {
+  const buffer = await readBinary(join(await jobDirOf(jobId), "content.md"));
   if (!buffer) throw new OcrError(`任务 ${jobId} 还没有 content.md`);
   return buffer.toString("utf8");
 }
 
 /** 老师的修订：写回 `content.md`（确认前可反复改）。 */
-export async function saveContent(projectId: string, jobId: string, markdown: string): Promise<void> {
-  const manifest = await readManifest(projectId, jobId);
+export async function saveContent(jobId: string, markdown: string): Promise<void> {
+  const dir = await jobDirOf(jobId);
+  const manifest = await readManifest(jobId);
   if (manifest.status === "confirmed") {
     throw new OcrError("已确认的来源不能再改；请新建一次识别任务");
   }
-  await writeBinaryAtomic(
-    join(ocrJobDir(projectId, jobId), "content.md"),
-    Buffer.from(markdown, "utf8"),
-  );
-  await writeJson(join(ocrJobDir(projectId, jobId), "manifest.json"), {
+  await writeBinaryAtomic(join(dir, "content.md"), Buffer.from(markdown, "utf8"));
+  await writeJson(join(dir, "manifest.json"), {
     ...manifest,
     updatedAt: new Date().toISOString(),
   });
@@ -378,11 +404,11 @@ export async function saveContent(projectId: string, jobId: string, markdown: st
  * 制作页只列 `confirmed` 的来源（profile §5.1：未经确认只能作候选）。
  */
 export async function confirmJob(input: {
-  projectId: string;
   jobId: string;
   confirmedBy?: string;
 }): Promise<OcrManifest> {
-  const manifest = await readManifest(input.projectId, input.jobId);
+  const dir = await jobDirOf(input.jobId);
+  const manifest = await readManifest(input.jobId);
   if (manifest.status === "confirmed") return manifest;
   const now = new Date().toISOString();
   const updated: OcrManifest = {
@@ -392,7 +418,7 @@ export async function confirmJob(input: {
     confirmedBy: input.confirmedBy?.trim() || "teacher",
     updatedAt: now,
   };
-  await writeJson(join(ocrJobDir(input.projectId, input.jobId), "manifest.json"), updated);
+  await writeJson(join(dir, "manifest.json"), updated);
   return updated;
 }
 
@@ -413,7 +439,7 @@ export type OcrJobView = OcrJobRecord & {
 };
 
 export async function toJobView(record: OcrJobRecord): Promise<OcrJobView> {
-  const manifest = await readManifest(record.projectId, record.id).catch(() => null);
+  const manifest = await readManifest(record.id).catch(() => null);
   return {
     ...record,
     manifest: manifest
@@ -437,32 +463,46 @@ export function effectiveStatus(view: OcrJobView): OcrJobStatus {
   return view.manifest?.status ?? view.status;
 }
 
-/** 已确认的来源清单（制作页下拉用）。扫目录，不维护第二份索引。 */
+/**
+ * 已确认的来源清单（制作页下拉用）。扫资料库目录，不维护第二份索引。
+ *
+ * 同时扫迁移前的老位置：老师先打开制作页、还没打开识别页时，迁移可能还没跑，
+ * 不能因此把已确认的来源漏掉（按 `jobId` 去重）。
+ */
 export async function listConfirmedSources(filter: {
-  /** 不给就列整个工作区——老师不需要按项目切换。 */
   projectId?: string;
   bookType?: BookType;
-}): Promise<OcrSourceSummary[]> {
-  const projectIds = filter.projectId
-    ? [filter.projectId]
-    : (await (await import("../db/store.ts")).getAppStore().listProjects()).map((project) => project.id);
+} = {}): Promise<OcrSourceSummary[]> {
   const summaries: OcrSourceSummary[] = [];
+  const seen = new Set<string>();
+  const collect = async (dirName: string, dir: string): Promise<void> => {
+    const manifest = await readJson<OcrManifest | null>(join(dir, "manifest.json"), null);
+    if (!manifest || manifest.status !== "confirmed") return;
+    if (seen.has(manifest.jobId)) return;
+    seen.add(manifest.jobId);
+    if (filter.projectId && manifest.projectId !== filter.projectId) return;
+    if (filter.bookType && manifest.bookType !== filter.bookType) return;
+    summaries.push({
+      jobId: manifest.jobId,
+      dirName: manifest.dirName ?? dirName,
+      projectId: manifest.projectId,
+      bookType: manifest.bookType,
+      originalName: manifest.originalName,
+      pageCount: manifest.pageCount,
+      confirmedAt: manifest.confirmedAt ?? manifest.updatedAt,
+    });
+  };
+
+  for (const dirName of await listDir(ocrLibraryDir())) {
+    await collect(dirName, ocrJobDir(dirName));
+  }
+  const projectIds = (await (await import("../db/store.ts")).getAppStore().listProjects()).map(
+    (project) => project.id,
+  );
   for (const projectId of projectIds) {
-    for (const name of await listDir(ocrDir(projectId))) {
-      const manifest = await readJson<OcrManifest | null>(
-        join(ocrJobDir(projectId, name), "manifest.json"),
-        null,
-      );
-      if (!manifest || manifest.status !== "confirmed") continue;
-      if (filter.bookType && manifest.bookType !== filter.bookType) continue;
-      summaries.push({
-        jobId: manifest.jobId,
-        projectId: manifest.projectId,
-        bookType: manifest.bookType,
-        originalName: manifest.originalName,
-        pageCount: manifest.pageCount,
-        confirmedAt: manifest.confirmedAt ?? manifest.updatedAt,
-      });
+    for (const jobId of await listDir(legacyOcrDir(projectId))) {
+      if (seen.has(jobId)) continue;
+      await collect(jobId, legacyOcrJobDir(projectId, jobId));
     }
   }
   return summaries.sort((a, b) => b.confirmedAt.localeCompare(a.confirmedAt));
@@ -477,14 +517,14 @@ export async function readOriginal(projectId: string, name: string): Promise<Buf
 }
 
 /** 供诊断：任务目录里的文件清单。 */
-export async function jobFiles(projectId: string, jobId: string): Promise<string[]> {
-  return listDir(ocrJobDir(projectId, jobId));
+export async function jobFiles(jobId: string): Promise<string[]> {
+  return listDir(await jobDirOf(jobId));
 }
 
 /** 读 `structure.json`。 */
-export async function readStructure(projectId: string, jobId: string): Promise<OcrStructure> {
+export async function readStructure(jobId: string): Promise<OcrStructure> {
   const structure = await readJson<OcrStructure | null>(
-    join(ocrJobDir(projectId, jobId), "structure.json"),
+    join(await jobDirOf(jobId), "structure.json"),
     null,
   );
   if (!structure) throw new OcrError(`任务 ${jobId} 还没有 structure.json`);
@@ -492,8 +532,8 @@ export async function readStructure(projectId: string, jobId: string): Promise<O
 }
 
 /** 读 `diagnostics.json`（失败原因、上游日志尾部）。 */
-export async function readDiagnostics(projectId: string, jobId: string): Promise<unknown> {
-  const raw = await readBinary(join(ocrJobDir(projectId, jobId), "diagnostics.json"));
+export async function readDiagnostics(jobId: string): Promise<unknown> {
+  const raw = await readBinary(join(await jobDirOf(jobId), "diagnostics.json"));
   if (!raw) return null;
   try {
     return JSON.parse(raw.toString("utf8"));

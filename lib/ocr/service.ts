@@ -18,6 +18,7 @@ import {
   assertImportable,
   createJob,
   deleteJob,
+  ensureJobLibraryDir,
   listJobs,
   normalizeIntoWorkspace,
   patchJob,
@@ -40,6 +41,7 @@ import type { ContentListBlock } from "../knowledge/ocr-pages.ts";
 import type { MiddleFile } from "./normalize.ts";
 import { OcrError, type OcrJobRecord } from "./types.ts";
 import { DEFAULT_PAGE_IMAGE } from "./pages.ts";
+import { ensureOcrLibraryLayout } from "./library.ts";
 
 /** 正在跑的任务句柄（进程级）：用于取消。服务重启后靠 pid 判定，不依赖这张表。 */
 const running = new Map<string, MineruHandle>();
@@ -67,10 +69,12 @@ function inBackground(jobId: string, task: () => Promise<void>): void {
 
 /** 把上游产物归一化进工作区，并把任务推进到「待核对」。 */
 async function normalizeJob(
-  job: OcrJobRecord,
+  input: OcrJobRecord,
   upstreamDir: string,
   options: { method?: string | null; language?: string | null; logTail?: string[] } = {},
 ): Promise<void> {
+  // 旧记录（升级前创建、重启后续跑）没有资料库文件夹名，先补上再落盘
+  const job = await ensureJobLibraryDir(input);
   await patchJob(job.id, { status: "normalizing", stage: "整理识别结果" });
   const upstream = await locateUpstream(upstreamDir, options.method ?? DEFAULT_MINERU_OPTIONS.method);
   const contentList = JSON.parse(await readFile(upstream.contentListPath, "utf8")) as ContentListBlock[];
@@ -179,6 +183,8 @@ export async function startRecognition(input: {
   originalName: string;
   originalPath: string;
   originalBytes?: number;
+  /** 学期：决定资料库文件夹名（spring-sb-ocr）。 */
+  term?: string;
 }): Promise<OcrJobRecord> {
   const ready = await checkMineru();
   if (!ready.ready) throw new OcrError(ready.reason ?? "OCR 引擎不可用");
@@ -188,6 +194,7 @@ export async function startRecognition(input: {
     bookType: input.bookType,
     originalName: assertImportable(input.originalName),
     originalPath: input.originalPath,
+    term: input.term,
   });
 
   inBackground(job.id, () => recognizeInto(job));
@@ -204,6 +211,7 @@ export async function startRecognition(input: {
 export async function startImport(input: {
   projectId: string;
   bookType: BookType;
+  term?: string;
   upstreamDir: string;
   /** 原始 PDF；不给就用上游的 `_origin.pdf`。 */
   originalPath?: string;
@@ -229,6 +237,7 @@ export async function startImport(input: {
     bookType: input.bookType,
     originalName,
     originalPath: joinPath(originalsDir(input.projectId), originalName),
+    term: input.term,
   });
   // 原件只复制不改写（走工作区原语，与上传路径同一套校验）
   await copyIntoWorkspace(sourcePath, job.originalPath);
@@ -250,7 +259,7 @@ export async function startImport(input: {
 export async function cancelJob(jobId: string): Promise<OcrJobRecord> {
   const job = await readJob(jobId);
   // 确认状态的事实源是 manifest（任务记录只管这次运行的过程）
-  const manifest = await readManifest(job.projectId, jobId).catch(() => null);
+  const manifest = await readManifest(jobId).catch(() => null);
   if (manifest?.status === "confirmed") throw new OcrError("已确认的来源不能取消");
   const handle = running.get(jobId);
   if (handle) {
@@ -268,7 +277,7 @@ export async function cancelJob(jobId: string): Promise<OcrJobRecord> {
 /** 重试：用同一份原件重跑一次（进度与产物都会重写）。 */
 export async function retryJob(jobId: string): Promise<OcrJobRecord> {
   const job = await readJob(jobId);
-  const manifest = await readManifest(job.projectId, jobId).catch(() => null);
+  const manifest = await readManifest(jobId).catch(() => null);
   if (manifest?.status === "confirmed") throw new OcrError("已确认的来源不需要重新识别");
   if (job.status === "running" || job.status === "normalizing") {
     throw new OcrError("任务正在运行中");
@@ -304,6 +313,8 @@ export async function reconcileOcrJobs(force = false): Promise<void> {
   if (!force && now - lastReconcile < 5000) return;
   lastReconcile = now;
 
+  // 旧版本的产物目录是 UUID：先迁到可读的资料库文件夹（幂等、每个进程一次）
+  await ensureOcrLibraryLayout();
   const records = await listJobs();
   for (const record of records) {
     // 本进程创建的任务由本进程负责：它可能刚建好、正在读页数/启动引擎，
@@ -382,7 +393,7 @@ async function capJobRecords(limit = 10): Promise<void> {
   const oldestFirst = [...records].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
   for (const record of oldestFirst) {
     if (overflow <= 0) break;
-    const manifest = await readManifest(record.projectId, record.id).catch(() => null);
+    const manifest = await readManifest(record.id).catch(() => null);
     if (manifest?.status === "confirmed") continue; // 资料库事实源，永不自动删
     await deleteJob(record.id, `识别记录超过 ${limit} 条，自动清理较早的记录`);
     overflow -= 1;

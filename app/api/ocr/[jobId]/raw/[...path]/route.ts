@@ -30,7 +30,7 @@ export async function GET(
   const { jobId, path } = await context.params;
   try {
     const job = await readJob(jobId);
-    const jobDir = resolve(ocrJobDir(job.projectId, jobId));
+    const jobDir = resolve(ocrJobDir(job.dirName ?? jobId));
     const relative = (path ?? []).join("/");
     if (!relative) throw new OcrError("缺少文件路径");
 

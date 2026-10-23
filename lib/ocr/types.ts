@@ -85,6 +85,9 @@ export type OcrManifest = {
   jobId: string;
   projectId: string;
   bookType: BookType;
+  /** 学期与资料库文件夹名，让产物自己说明它在哪个文件夹里。 */
+  term?: string;
+  dirName?: string;
   /** 原始文件名（已复制进 `sources/originals/`）。 */
   originalName: string;
   originalBytes: number;
@@ -113,6 +116,13 @@ export type OcrJobRecord = {
   id: string;
   projectId: string;
   bookType: BookType;
+  /** 学期（winter / spring / summer / autumn），用于资料库文件夹命名。 */
+  term?: string;
+  /**
+   * 资料库文件夹名，如 `spring-sb-ocr`。
+   * 旧记录没有这个字段，迁移时补上；产物目录始终以它为准。
+   */
+  dirName?: string;
   status: OcrJobStatus;
   /** 原文件在工作区里的绝对路径。 */
   originalPath: string;
@@ -155,6 +165,8 @@ export type OcrStructure = {
 /** 已确认来源的摘要，供制作页下拉选择。 */
 export type OcrSourceSummary = {
   jobId: string;
+  /** 资料库文件夹名，界面显示给老师找文件用。 */
+  dirName?: string;
   projectId: string;
   bookType: BookType;
   originalName: string;

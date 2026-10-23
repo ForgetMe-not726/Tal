@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { confirmJob, readJob } from "@/lib/ocr/jobs";
+import { confirmJob } from "@/lib/ocr/jobs";
 import { OcrError } from "@/lib/ocr/types";
 
 export const runtime = "nodejs";
@@ -14,9 +14,7 @@ export async function POST(request: Request, context: { params: Promise<{ jobId:
   const { jobId } = await context.params;
   try {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
-    const job = await readJob(jobId);
     const manifest = await confirmJob({
-      projectId: job.projectId,
       jobId,
       confirmedBy: typeof body.confirmedBy === "string" ? body.confirmedBy : undefined,
     });

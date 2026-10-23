@@ -93,19 +93,20 @@ AI教材工作台/
     grammar/                        # 语法参考（按语法点，含 index.json）
     review-standards/               # 审校判据（按小节引用）
     entries.json                    # 工作区级知识条目（预留）
+  sources/                          # 顶层资料库：老师直接打开就能找到识别结果
+    ocr/
+      <学期>-<书种>-ocr/            # spring-sb-ocr；sb/wb/kl/vocab；重名自动加 -2
+        manifest.json               # 引擎、版本、参数、状态、页数、确认信息
+        content.md                  # 结构化 Markdown（带页码标记与课号）
+        structure.json              # 块：类型、页码、坐标（归一化）、阅读顺序、文本、置信度
+        pages/                      # 整页页图（JPEG 150DPI，可重建）
+        assets/                     # 区域裁切资产（表格/插图）
+        diagnostics.json            # 失败原因、低置信块、上游日志尾部
   projects/
     <project-id>/
       project.json                  # 年级、学期、Lesson 目录、项目设置
       sources/
         originals/                  # 原始 PDF / 图片，只复制不改写
-        ocr/
-          <ocr-job-id>/
-            manifest.json           # 引擎、版本、参数、状态、页数、确认信息
-            content.md              # 结构化 Markdown（带页码标记与课号）
-            structure.json          # 块：类型、页码、坐标（归一化）、阅读顺序、文本、置信度
-            pages/                  # 整页页图（JPEG 150DPI，可重建）
-            assets/                 # 区域裁切资产（表格/插图）
-            diagnostics.json        # 失败原因、低置信块、上游日志尾部
       lessons/
         lesson-<NN>/                # 与实现一致：lesson-01、lesson-02…
           lesson.json

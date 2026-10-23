@@ -12,8 +12,8 @@ export async function GET(_request: Request, context: { params: Promise<{ jobId:
     const job = await readJob(jobId);
     // 产物还没生成时不报错，返回 null 让界面按状态显示
     const [manifest, structure] = await Promise.all([
-      readManifest(job.projectId, jobId).catch(() => null),
-      readStructure(job.projectId, jobId).catch(() => null),
+      readManifest(jobId).catch(() => null),
+      readStructure(jobId).catch(() => null),
     ]);
     return NextResponse.json({
       job: await toJobView(job),
@@ -36,8 +36,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ jobId
     const body = (await request.json()) as Record<string, unknown>;
     const markdown = typeof body.markdown === "string" ? body.markdown : "";
     if (!markdown.trim()) throw new OcrError("正文不能为空");
-    const job = await readJob(jobId);
-    await saveContent(job.projectId, jobId, markdown);
+    await saveContent(jobId, markdown);
     return NextResponse.json({ ok: true });
   } catch (error) {
     const status = error instanceof OcrError ? 400 : 500;
