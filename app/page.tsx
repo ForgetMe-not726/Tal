@@ -6,6 +6,10 @@ import { listRulesWithVersions } from "@/lib/rules/service";
 import { FLOW_UNITS } from "@/lib/mock";
 import { cn } from "@/lib/utils";
 
+// 首页要读当前工作区的规则；不能在构建时预渲染——那会把规则快照烤进静态页，
+// 也会让 `next build` 去创建/迁移用户的工作区。
+export const dynamic = "force-dynamic";
+
 const ICONS = {
   make: FilePlus2,
   review: ClipboardCheck,

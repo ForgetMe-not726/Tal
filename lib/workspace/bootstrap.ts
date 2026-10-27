@@ -26,8 +26,10 @@ import {
   moduleDefinitionsPath,
   rebuildableDirs,
   rulesDir,
+  installRoot,
   workspaceRoot,
 } from "./paths.ts";
+import { ensureWorkspaceLayout } from "./migrate.ts";
 
 export type WorkspaceFile = {
   schema_version: number;
@@ -37,9 +39,9 @@ export type WorkspaceFile = {
   updated_at: string;
 };
 
-/** 随包分发的基线资源目录。打包时与程序同级。 */
+/** 随包分发的基线资源目录。打包后与程序同级（安装目录/resources）。 */
 export function resourcesDir(): string {
-  return join(process.cwd(), "resources");
+  return join(installRoot(), "resources");
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -74,9 +76,18 @@ async function seedFromResources(source: string, target: string): Promise<void> 
  * 确保工作区存在且结构完整。幂等，可在每次取 store 前调用。
  */
 export async function ensureWorkspace(): Promise<string> {
+  // 先做一次性布局迁移（旧文档目录 → 安装目录/document；sources/ocr → ocr）
+  await ensureWorkspaceLayout();
   const root = workspaceRoot();
 
-  await mkdir(root, { recursive: true });
+  try {
+    await mkdir(root, { recursive: true });
+  } catch {
+    throw new Error(
+      `无法创建工作区（${root}）。安装目录可能不可写：请把程序安装在当前用户可写的目录，` +
+        `或设置 AI_TEACHING_INSTALL_DIR 指向可写位置。`,
+    );
+  }
   for (const dir of [rulesDir(), knowledgeDir(), join(root, PROJECTS_DIR), join(root, EXPORTS_DIR), appDir()]) {
     await mkdir(dir, { recursive: true });
   }

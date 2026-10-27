@@ -44,3 +44,6 @@ next-env.d.ts
 # 本地开发工具产物：不属于项目源码，也不该被提交
 /.claude/
 /.impeccable/
+
+# 本地工作区（安装目录下的 document，运行时生成，不提交）
+/document/

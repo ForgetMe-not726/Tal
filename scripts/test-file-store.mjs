@@ -7,6 +7,7 @@ import { loadRelatedVersions } from "../lib/knowledge/related-content.ts";
 import { workspaceProject } from "../lib/workspace/default-project.ts";
 import { ensureWorkspace } from "../lib/workspace/bootstrap.ts";
 import { readJson, writeJson } from "../lib/workspace/json.ts";
+import { installRoot, workspaceRoot } from "../lib/workspace/paths.ts";
 
 /** 每个用例一个干净工作区，互不干扰。 */
 function withWorkspace(run) {
@@ -512,6 +513,25 @@ async function testWorkspaceProjectIsImplicit() {
   });
 }
 
+/** 工作区默认落在安装目录的 document 下（不再写用户文档目录）。 */
+function testWorkspaceRootFollowsInstallDir() {
+  const install = mkdtempSync(join(tmpdir(), "install-"));
+  const prevInstall = process.env.AI_TEACHING_INSTALL_DIR;
+  const prevWorkspace = process.env.AI_TEACHING_WORKSPACE;
+  delete process.env.AI_TEACHING_WORKSPACE;
+  process.env.AI_TEACHING_INSTALL_DIR = install;
+  try {
+    assert.equal(installRoot(), install);
+    assert.equal(workspaceRoot(), join(install, "document"));
+  } finally {
+    if (prevInstall == null) delete process.env.AI_TEACHING_INSTALL_DIR;
+    else process.env.AI_TEACHING_INSTALL_DIR = prevInstall;
+    if (prevWorkspace == null) delete process.env.AI_TEACHING_WORKSPACE;
+    else process.env.AI_TEACHING_WORKSPACE = prevWorkspace;
+    rmSync(install, { recursive: true, force: true });
+  }
+}
+
 const tests = [
   ["工作区初始化建出完整目录树", testBootstrapCreatesTree],
   ["初始化幂等且不覆盖老师内容", testBootstrapIsIdempotentAndNonDestructive],
@@ -528,6 +548,7 @@ const tests = [
   ["危险目录名被安全化", testUnsafeSegmentsAreSanitized],
   ["跨书上下文只取已确认且排除自己", testRelatedContentLoader],
   ["默认项目隐式存在且沿用历史项目", testWorkspaceProjectIsImplicit],
+  ["工作区在安装目录的 document 下", testWorkspaceRootFollowsInstallDir],
 ];
 
 for (const [name, test] of tests) {

@@ -34,11 +34,15 @@
 ## 3. 工作区备份与恢复
 
 - 工作区是教材、规则、OCR 结果、版本和导出物的唯一事实源；
-- 备份时完整复制工作区，保留 sources/originals、sources/ocr、rules、references、lessons、exports 和 .app；
+- 安装包必须装到当前用户**可写**的目录，否则 `document/` 建不出来（程序会给出明确提示，不会写到用户文档目录兜底）；
+- 工作区固定在**安装目录下的 `document/`**（`rules/` 规则库、`knowledge/` 资料库、`ocr/` OCR 内容，以及 `projects/`、`exports/`、`.app/`）；
+- 备份时完整复制 `document/`，保留 `ocr/`、`projects/<id>/sources/originals`、`rules/`、`knowledge/`、`projects/<id>/lessons`、`exports/` 和 `.app/`；
 - .app/index.json 等索引可以重建，但原件、manifest、正文、结构 JSON 和版本文件不能缺失；
 - 项目删除默认进入工作区回收区；除非用户明确确认，不删除原始教材和导出文件。
 
 ## 4. 依赖与许可证
+
+安装包必须装到当前用户可写的目录，并由桌面壳把程序所在目录通过 `AI_TEACHING_INSTALL_DIR` 传给应用；工作区固定为该目录下的 `document/`。
 
 每个发布版本应附带依赖清单，至少记录：
 
@@ -53,9 +57,9 @@ MinerU 或其他带附加许可的 OCR 引擎，未经公司确认不得放入�
 
 | 依赖 | 版本 | 许可 | 状态 |
 | --- | --- | --- | --- |
-| MinerU（本机 venv，`~/.venvs/mineru`） | 3.4.5 | Apache-2.0 + 附加条款（商用与分发允许，门槛远未触及） | **仅本机调用**，未随包分发；随包前走 Q-CORE-012 |
+| MinerU（本机 venv，`~/.venvs/mineru`） | 3.4.5 | Apache-2.0 + 附加条款（商用与分发允许，门槛远未触及） | 随包分发已由需求方确认（2026-10-27，A-018）；发布前登记版本与许可证 |
 | pypdfium2（渲染整页页图） | 5.10.1 | Apache-2.0 / BSD 系 | 随 venv 提供；随包分发前同样逐项核验 |
-| MinerU 所带模型（PDF-Extract-Kit、MinerU2.5-Pro） | 见 `~/mineru.json` | 需逐项归档 | Q-CORE-012 / Q-CORE-020 |
+| MinerU 所带模型（PDF-Extract-Kit、MinerU2.5-Pro） | 见 `~/mineru.json` | 需逐项归档 | 随包分发已确认（A-018），发布前逐项归档 |
 
 引擎路径由环境变量 `MINERU_HOME` 指定（默认 `~/.venvs/mineru`）。安装包阶段这一层要换成
 随包 sidecar——`lib/ocr/mineru.ts` 是唯一需要改的地方，业务层不动。

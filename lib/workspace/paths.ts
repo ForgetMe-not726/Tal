@@ -14,7 +14,7 @@
  *   knowledge/                         参考资料（剑桥等），随包分发基线
  *     entries.json  cambridge/  other/
  *   module-definitions.json            模块目录（canonical）
- *   sources/ocr/<学期>-<书种>-ocr/        资料库：OCR 产物（老师直接打开就能看懂）
+ *   ocr/<学期>-<书种>-ocr/                OCR 内容（老师直接打开就能看懂）
  *   projects/<project-id>/
  *     project.json
  *     sources/originals/<原文件>           原始 PDF / 图片，只复制不改写
@@ -33,10 +33,39 @@
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 
-/** 工作区根目录。环境变量优先，便于测试与多工作区切换。 */
+/** 工作区目录名：安装目录下的 `document`（需求方 2026-10-27 确认）。 */
+export const WORKSPACE_DIR_NAME = "document";
+
+/**
+ * 安装目录。
+ *
+ * 打包后由桌面壳设置 `AI_TEACHING_INSTALL_DIR`（程序所在目录）；
+ * 开发时就是项目根。工作区与随包资源都以它为基准，不再往用户文档目录新开文件夹。
+ */
+export function installRoot(): string {
+  const override = process.env.AI_TEACHING_INSTALL_DIR?.trim();
+  if (override) return resolve(override);
+  return resolve(process.cwd());
+}
+
+/** 默认工作区（安装目录/document）。 */
+export function defaultWorkspaceRoot(): string {
+  return join(installRoot(), WORKSPACE_DIR_NAME);
+}
+
+/**
+ * 工作区根目录。
+ *
+ * `AI_TEACHING_WORKSPACE` 仍保留：测试与多工作区切换用，显式指定时**不做**旧目录迁移。
+ */
 export function workspaceRoot(): string {
   const override = process.env.AI_TEACHING_WORKSPACE?.trim();
   if (override) return resolve(override);
+  return defaultWorkspaceRoot();
+}
+
+/** 2026-10-27 之前的默认工作区，只用于一次性迁移。 */
+export function legacyWorkspaceRoot(): string {
   return join(homedir(), "Documents", "AI教材工作台");
 }
 
@@ -172,23 +201,19 @@ export function reviewJobDir(projectId: string, lessonNumber: number, jobId: str
 }
 
 /**
- * 资料库：工作区顶层的 `sources/`。
+ * OCR 资料库：工作区顶层的 `ocr/`。
  *
- * 识别结果不放在 `projects/<UUID>/` 下面——老师要在资源管理器里直接找到它，
- * 项目序号对人是噪音。文件夹用 `<学期>-<书种>-ocr`（如 `spring-sb-ocr`），
- * 重名自动加序号，不覆盖已有结果。
+ * 安装目录下的工作区形如 `<安装目录>/document/{rules,knowledge,ocr}`：
+ * 规则库、资料库、OCR 内容各自独立，老师打开 `document` 就能看懂。
+ * 识别结果文件夹用 `<学期>-<书种>-ocr`（如 `spring-sb-ocr`），重名自动加序号。
  */
-export function libraryDir(): string {
-  return join(workspaceRoot(), SOURCES_DIR);
+export function ocrLibraryDir(): string {
+  return join(workspaceRoot(), OCR_DIR);
 }
 
-/** 原始 PDF / 图片，只复制不改写。 */
+/** 原始 PDF / 图片，只复制不改写（跟着课时走，不进顶层资料库）。 */
 export function originalsDir(projectId: string): string {
   return join(projectDir(projectId), SOURCES_DIR, ORIGINALS_DIR);
-}
-
-export function ocrLibraryDir(): string {
-  return join(libraryDir(), OCR_DIR);
 }
 
 /** 资料库里的一个识别结果目录（参数是文件夹名，不是任务 id）。 */
