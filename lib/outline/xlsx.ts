@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { inflateRawSync } from "node:zlib";
-import { parseCellAnnotations, splitLessonCell } from "./annotations.ts"
+import { parseCellAnnotations, splitLessonCell } from "./annotations.ts";
+import { firstExamSkill } from "./exam-skills.ts";
 import type {
   OutlineCellLocator,
   OutlineLessonProfile,
@@ -244,6 +245,7 @@ function parseLessons(worksheet: ParsedOutlineWorksheet): { headers: string[]; l
       const column = findColumn(columns, keys);
       return column == null ? null : textAt(row, column) || null;
     };
+    const examSkills = value(["考试技能", "技能"]);
     lessons.push({
       lessonNumber: parsed.lessonNumber,
       lessonKey: `lesson_${parsed.lessonNumber}`,
@@ -258,7 +260,8 @@ function parseLessons(worksheet: ParsedOutlineWorksheet): { headers: string[]; l
       useOfEnglish: value(["Use of English", "UseOfEnglish"]),
       readingExamType: value(["阅读考试题型", "阅读题型"]),
       grammar: value(["语法知识点", "语法"]),
-      examSkills: value(["考试技能", "技能"]),
+      examSkills,
+      primaryExamSkill: firstExamSkill(examSkills),
       listening: value(["听力", "Listening"]),
       speaking: value(["口语", "Speaking"]),
       writing: value(["写作", "Writing"]),

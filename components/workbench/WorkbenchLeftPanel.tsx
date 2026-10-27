@@ -13,6 +13,7 @@ import { sourceUnitForTargetLesson } from "@/lib/knowledge/legacy-markdown";
 import { plateLetter, plateTone } from "@/lib/mock";
 import { BOOK_TYPES, LEVELS } from "@/lib/mock";
 import { cn } from "@/lib/utils";
+import { unsupportedLessonMessage } from "@/lib/curriculum";
 import type { AiDiagnosticsView, BookTypeId, GeneratedBlock, LessonType, Level, ModuleDef, OutlineLessonProfile, OutlineProfile, Term } from "@/lib/types";
 import { TERM_LABEL, TERMS } from "@/lib/types";
 
@@ -97,6 +98,7 @@ export function WorkbenchLeftPanel({
   const doneCount = modules.filter((module) => generated.has(module.moduleKey ?? module.id)).length;
   const busy = loadingModule !== null;
   const canGenerate = selectedOutlineLesson !== null && modules.length > 0;
+  const unsupported = unsupportedLessonMessage(bookType, lessonType);
 
   return (
     <aside className="flex h-full w-[280px] shrink-0 flex-col overflow-y-auto border-r border-line bg-paper">
@@ -299,8 +301,13 @@ export function WorkbenchLeftPanel({
               );
             })}
             {modules.length === 0 && (
-              <p className="rounded-md border border-dashed border-ink-3/50 px-2 py-3 text-center text-[10px] leading-relaxed text-ink-3">
-                该书种暂无模块目录
+              <p
+                className={cn(
+                  "rounded-md border border-dashed px-2 py-3 text-center text-[10px] leading-relaxed",
+                  unsupported ? "border-amber-300 bg-amber-50/50 text-amber-800" : "border-ink-3/50 text-ink-3",
+                )}
+              >
+                {unsupported ?? "该书种暂无模块目录"}
               </p>
             )}
           </div>

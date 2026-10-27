@@ -1,7 +1,8 @@
 # AI 教材智能迁移与审校工具
-## 产品与技术总体方案 V1.2
+## 产品与技术总体方案 V1.3
 
-> 生效日期：2026-09-22
+> 生效日期：2026-10-27（V1.2 起于 2026-09-22）
+> V1.3 增补：工作区移入安装目录 `document/`；复习课口径（春/秋 5、10、15，夏/冬 7，复习课无知识清单）；默认只做一个剑桥题型。
 > 本版覆盖：产品部署形态、数据边界、OCR、独立审校工作台、AI 修改建议与本地检索助手。
 > 保留原则：历史方案中未与本版冲突的教材迁移、规则、人工确认、版本与审校原则继续有效；本文件为唯一权威方案。
 
@@ -66,18 +67,22 @@ Preserve → Adapt → Generate
 
 ## 3. 本地工作区：唯一事实源
 
-应用首次启动时自动建立固定工作区。默认路径暂定为：
+应用首次启动时在**安装目录**下自动建立 `document/` 工作区（需求方 2026-10-27 确认），不再往用户文档目录新开文件夹：
 
 ~~~text
-%USERPROFILE%\Documents\AI教材工作台
+<安装目录>/
+  resources/                        # 随包基线（规则、资料库），与程序同级
+  document/                         # 工作区：唯一事实源
 ~~~
+
+`document/` 下按老师能看懂的方式分开放：`rules/`（规则库）、`knowledge/`（资料库）、`ocr/`（OCR 内容）。旧版位于 `%USERPROFILE%\Documents\AI教材工作台` 的工作区，首次启动时整体迁移进 `document/` 并删除旧目录；安装目录必须对当前用户可写（安装包应装到用户可写位置）。
 
 工作区的内容全部可由老师在文件管理器中备份、复制和迁移；应用负责创建目录、命名、索引与校验，不要求老师手工整理。
 
 建议目录契约如下：
 
 ~~~text
-AI教材工作台/
+document/
   workspace.json                    # 工作区版本、应用配置与本地索引
   rules/                            # 顶层：跨项目规则（随包基线 + 老师新增）
     <rule-set-id>/
@@ -93,15 +98,14 @@ AI教材工作台/
     grammar/                        # 语法参考（按语法点，含 index.json）
     review-standards/               # 审校判据（按小节引用）
     entries.json                    # 工作区级知识条目（预留）
-  sources/                          # 顶层资料库：老师直接打开就能找到识别结果
-    ocr/
-      <学期>-<书种>-ocr/            # spring-sb-ocr；sb/wb/kl/vocab；重名自动加 -2
-        manifest.json               # 引擎、版本、参数、状态、页数、确认信息
-        content.md                  # 结构化 Markdown（带页码标记与课号）
-        structure.json              # 块：类型、页码、坐标（归一化）、阅读顺序、文本、置信度
-        pages/                      # 整页页图（JPEG 150DPI，可重建）
-        assets/                     # 区域裁切资产（表格/插图）
-        diagnostics.json            # 失败原因、低置信块、上游日志尾部
+  ocr/                              # OCR 内容：老师直接打开就能找到识别结果
+    <学期>-<书种>-ocr/              # spring-sb-ocr；sb/wb/kl/vocab；重名自动加 -2
+      manifest.json                 # 引擎、版本、参数、状态、页数、确认信息
+      content.md                    # 结构化 Markdown（带页码标记与课号）
+      structure.json                # 块：类型、页码、坐标（归一化）、阅读顺序、文本、置信度
+      pages/                        # 整页页图（JPEG 150DPI，可重建）
+      assets/                       # 区域裁切资产（表格/插图）
+      diagnostics.json              # 失败原因、低置信块、上游日志尾部
   projects/
     <project-id>/
       project.json                  # 年级、学期、Lesson 目录、项目设置

@@ -19,6 +19,7 @@ import { BOOK_TYPES, plateLetter, plateTone } from "@/lib/mock";
 import { moduleOrdinal } from "@/lib/markdown/heading-levels";
 import { applySuggestionToMarkdown, type ApplyFailureReason } from "@/lib/suggestions/apply";
 import { TERM_LABEL } from "@/lib/types";
+import { inferLessonType } from "@/lib/curriculum";
 import type { AiDiagnosticsView, BlockCheck, ContentSuggestion, BookTypeId, ExportFormat, GeneratedBlock, LegacyLessonPackage, LegacySectionKey, LessonType, Level, ModuleDef, ModuleVersionSummary, OutlineLessonProfile, OutlineProfile, Term, WorkbenchSuggestion } from "@/lib/types";
 
 /**
@@ -299,6 +300,10 @@ export default function WorkbenchPage() {
     setSelectedLessonKey(lesson.lessonKey);
     setLessonNumber(lesson.lessonNumber);
     setLessonTitle(lesson.title || lesson.targetTitle || `Lesson ${lesson.lessonNumber}`);
+    // 课型按学期课次自动判定（春/秋 5、10、15，夏/冬 7），老师仍可手动改
+    setLessonType(
+      inferLessonType({ term, lessonNumber: lesson.lessonNumber, title: lesson.title }),
+    );
     updateFileName(level, bookType, lesson.lessonNumber, lesson.title || lesson.targetTitle);
   }
 
@@ -806,6 +811,13 @@ export default function WorkbenchPage() {
           setProjects([]);
           setProjectId("");
           setTerm(next);
+          // 复习课口径跟学期走（春/秋 15 课与夏/冬 7 课的复习位置不同）
+          const lesson = outlineProfile?.lessons.find((item) => item.lessonKey === selectedLessonKey);
+          if (lesson) {
+            setLessonType(
+              inferLessonType({ term: next, lessonNumber: lesson.lessonNumber, title: lesson.title }),
+            );
+          }
         }}
         lessonNumber={lessonNumber}
         lessonTitle={lessonTitle}

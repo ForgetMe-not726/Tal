@@ -17,7 +17,10 @@ type ObjectivesProfile = {
   coreVocabulary: string | null;
   grammar: string | null;
   reading: string | null;
+  /** 大纲原文（可能多个题型）。 */
   examSkills: string | null;
+  /** 实际使用的一个题型；没给就退回 `examSkills`。 */
+  primaryExamSkill?: string | null;
   theme?: string | null;
 };
 
@@ -42,7 +45,7 @@ export function buildObjectivesMarkdown(profile: ObjectivesProfile): string | nu
     ["目标词汇", cellValue(profile.coreVocabulary)],
     ["核心语法", cellValue(profile.grammar)],
     ["阅读文章", cellValue(profile.reading)],
-    ["技能训练", cellValue(profile.examSkills)],
+    ["技能训练", cellValue(profile.primaryExamSkill ?? profile.examSkills)],
   ];
   if (!rows.some(([, value]) => value)) return null;
   const body = rows.map(([label, value]) => `| ${label} | ${value} |`).join("\n");
@@ -90,7 +93,9 @@ export function buildLessonObjectivesMarkdown(
         cellValue(profile.theme) ? `learn words about ${cellValue(profile.theme)}` : "",
         cellValue(profile.reading) ? `read the article ${cellValue(profile.reading)}` : "",
         cellValue(profile.grammar) ? `learn the grammar of ${cellValue(profile.grammar)}` : "",
-        cellValue(profile.examSkills) ? `practise the use of ${cellValue(profile.examSkills)}` : "",
+        cellValue(profile.primaryExamSkill ?? profile.examSkills)
+          ? `practise the use of ${cellValue(profile.primaryExamSkill ?? profile.examSkills)}`
+          : "",
       ].filter(Boolean);
 
   if (lines.length === 0) return null;

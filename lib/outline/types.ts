@@ -56,7 +56,10 @@ export type OutlineLessonProfile = {
   useOfEnglish: string | null;
   readingExamType: string | null;
   grammar: string | null;
+  /** 大纲原文：可能列多个剑桥题型。 */
   examSkills: string | null;
+  /** 实际使用的一个题型（默认只做一个，需求方 2026-10-27 确认）。 */
+  primaryExamSkill: string | null;
   listening: string | null;
   speaking: string | null;
   writing: string | null;

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ensureWorkspace } from "../lib/workspace/bootstrap.ts";
@@ -33,13 +33,8 @@ function testKnowledgeModules() {
     "lets_read(2)",
     "lets_talk(3)",
   ]);
-  // 知识清单两种课型结构相同
-  expectModules("knowledge", "revision", [
-    "learning_objectives",
-    "lets_say(1)",
-    "lets_read(2)",
-    "lets_talk(3)",
-  ]);
+  // 复习课没有知识清单（需求方 2026-10-27 确认）
+  expectModules("knowledge", "revision", []);
   // 学习目标是「字段名 + 内容」表，标题并进表格首行，所以 heading 为 null
   assert.equal(findModuleOutline("knowledge", "learning_objectives")?.heading, null);
 }
@@ -343,6 +338,30 @@ function testHeadingNullIsRespected() {
   );
 }
 
+/** 复习课没有知识清单：目录取数层要挡住，即使工作区里的 payload 还写着两课型。 */
+async function testKnowledgeHasNoRevision() {
+  const root = mkdtempSync(join(tmpdir(), "module-dir-"));
+  process.env.AI_TEACHING_WORKSPACE = root;
+  try {
+    await ensureWorkspace();
+    // 模拟老工作区：payload 明确写着知识清单也支持复习课
+    const file = join(root, "module-definitions.json");
+    const rows = JSON.parse(readFileSync(file, "utf8")).map((row) =>
+      row.book_type === "knowledge"
+        ? { ...row, payload: { ...row.payload, lessonTypes: ["regular", "revision"] } }
+        : row,
+    );
+    writeFileSync(file, JSON.stringify(rows));
+    const { listModuleDefinitions } = await import("../lib/modules/service.ts");
+    assert.deepEqual(await listModuleDefinitions("knowledge", "revision"), [], "复习课不产出知识清单");
+    assert.equal((await listModuleDefinitions("knowledge", "regular")).length, 4, "常规课四个模块不变");
+    assert.ok((await listModuleDefinitions("student", "revision")).length > 0, "学生用书复习课照常");
+  } finally {
+    delete process.env.AI_TEACHING_WORKSPACE;
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 const tests = [
   ["知识清单模块与编号", testKnowledgeModules],
   ["学生用书模块与编号（含复习课）", testStudentModules],
@@ -357,6 +376,7 @@ const tests = [
   ["目录项回落到出厂默认", testResolveFallsBackToFactoryDefault],
   ["heading 显式 null 被尊重", testHeadingNullIsRespected],
   ["工作区目录文件与出厂目录一致", testWorkspaceSeedMatchesDirectory],
+  ["复习课没有知识清单", testKnowledgeHasNoRevision],
 ];
 
 for (const [name, test] of tests) {

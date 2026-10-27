@@ -96,7 +96,8 @@ const KNOWLEDGE_MODULES: ModuleOutline[] = [
     heading: null,
     sortOrder: 0,
     numbered: false,
-    lessonTypes: ALL_LESSON_TYPES,
+    // 复习课没有知识清单（需求方 2026-10-27 确认）。
+    lessonTypes: REGULAR_ONLY,
     deterministic: "objectives_table",
     sourceSections: [],
     // 本模块由 buildObjectivesMarkdown 直接生成，不走模型，这里的说明仅作档案。
@@ -110,7 +111,8 @@ const KNOWLEDGE_MODULES: ModuleOutline[] = [
     heading: "Let's say!",
     sortOrder: 1,
     numbered: true,
-    lessonTypes: ALL_LESSON_TYPES,
+    // 复习课没有知识清单（需求方 2026-10-27 确认）。
+    lessonTypes: REGULAR_ONLY,
     sourceSections: ["say"],
     outline: `依次输出三个部分：
 
@@ -148,7 +150,8 @@ const KNOWLEDGE_MODULES: ModuleOutline[] = [
     heading: "Let's read!",
     sortOrder: 2,
     numbered: true,
-    lessonTypes: ALL_LESSON_TYPES,
+    // 复习课没有知识清单（需求方 2026-10-27 确认）。
+    lessonTypes: REGULAR_ONLY,
     sourceSections: ["read"],
     outline: `依次输出两个部分：
 
@@ -200,7 +203,8 @@ const KNOWLEDGE_MODULES: ModuleOutline[] = [
     heading: "Let's talk!",
     sortOrder: 3,
     numbered: true,
-    lessonTypes: ALL_LESSON_TYPES,
+    // 复习课没有知识清单（需求方 2026-10-27 确认）。
+    lessonTypes: REGULAR_ONLY,
     sourceSections: ["talk"],
     outline: `依次输出：
 

@@ -75,7 +75,7 @@ const relationships = `<Relationships xmlns="http://schemas.openxmlformats.org/p
 const shared = `<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>单元-2.0版本</t></si><si><t>核心词汇</t></si></sst>`;
 const worksheet = `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>
   <row r="1">${sharedCell("A1", 0)}${sharedCell("B1", 1)}${inlineCell("C1", "阅读")} ${inlineCell("D1", "语法知识点")} ${inlineCell("E1", "考试技能")}</row>
-  <row r="2">${inlineCell("A2", "Unit 1\nHome truths （变更：source=旧版语法；target=lets_talk；action=ADAPT；status=confirmed；reason=模板调整）")}${inlineCell("B2", "theme")}${inlineCell("C2", "核心词汇数量：14个")}${inlineCell("D2", "被动语态")}${inlineCell("E2", "Reading Part 5")}</row>
+  <row r="2">${inlineCell("A2", "Unit 1\nHome truths （变更：source=旧版语法；target=lets_talk；action=ADAPT；status=confirmed；reason=模板调整）")}${inlineCell("B2", "theme")}${inlineCell("C2", "核心词汇数量：14个")}${inlineCell("D2", "被动语态")}${inlineCell("E2", "Reading Part 5 / Writing Part 2 (article)")}</row>
   <row r="3">${inlineCell("A3", "Unit 2\nShopping （原Unit 5）")}${inlineCell("B3", "market")}${inlineCell("C3", "核心词汇数量：15个")}</row>
   <row r="4">${inlineCell("A4", "Unit 3\nHome truths")}<c r="B4" s="1"/><c r="C4" s="2"/>${inlineCell("D4", "被动语态")}${inlineCell("E4", "Reading Part 5")}</row>
 </sheetData></worksheet>`;
@@ -95,11 +95,14 @@ const emptyCells = profile.lessons[2];
 assert.equal(emptyCells.lessonNumber, 3);
 assert.equal(emptyCells.grammar, "被动语态");
 assert.equal(emptyCells.examSkills, "Reading Part 5");
+assert.equal(emptyCells.primaryExamSkill, "Reading Part 5");
 assert.equal(emptyCells.coreVocabulary, null);
 assert.equal(profile.lessons[0].title, "Home truths");
 assert.equal(profile.lessons[0].targetTitle.startsWith("Home truths"), true);
 assert.equal(profile.lessons[0].sourceCellText.includes("Unit 1"), true);
 assert.equal(profile.lessons[0].grammar, "被动语态");
+assert.equal(profile.lessons[0].examSkills, "Reading Part 5 / Writing Part 2 (article)");
+assert.equal(profile.lessons[0].primaryExamSkill, "Reading Part 5", "默认只做第一个题型");
 assert.equal(profile.lessons[0].mappings[0].action, "ADAPT");
 assert.equal(profile.lessons[0].mappings[0].status, "confirmed");
 assert.equal(profile.lessons[1].mappings[0].status, "pending");

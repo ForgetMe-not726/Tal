@@ -1,11 +1,12 @@
-import { getAppStore } from "@/lib/db/store";
-import type { BookType, LessonType, ModuleDefinitionRow } from "@/lib/db/types";
+import { getAppStore } from "../db/store.ts";
+import { bookSupportsLessonType } from "../curriculum.ts";
+import type { BookType, LessonType, ModuleDefinitionRow } from "../db/types.ts";
 import {
   ModuleDirectoryError,
   findModuleOutline,
   resolveModuleOutline,
   type ModuleOutline,
-} from "@/lib/modules/directory";
+} from "./directory.ts";
 
 /**
  * 模块目录的**取数层**。
@@ -21,6 +22,8 @@ export async function listModuleDefinitions(
   bookType?: BookType,
   lessonType?: LessonType,
 ): Promise<ModuleDefinitionRow[]> {
+  // 产品口径优先于目录数据：知识清单没有复习课（老工作区的 payload 可能还写着两课型）
+  if (bookType && lessonType && !bookSupportsLessonType(bookType, lessonType)) return [];
   try {
     const rows = await getAppStore().listModuleDefinitions(bookType);
     if (!lessonType) return rows;

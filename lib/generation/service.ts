@@ -1,4 +1,5 @@
 import { getAppStore } from "@/lib/db/store";
+import { bookSupportsLessonType, unsupportedLessonMessage } from "@/lib/curriculum";
 import { aiComplete, type AiResult } from "@/lib/ai/gateway";
 import {
   filterRuleSetByType,
@@ -11,6 +12,7 @@ import type { BookType, Grade, LessonRow, LessonType, ModuleVersionRow } from "@
 import type { SourceVerificationMode } from "@/lib/knowledge/types";
 import { saveSourceImport } from "@/lib/knowledge/repository";
 import type { OutlineLessonProfile } from "@/lib/outline/types";
+import { firstExamSkill } from "@/lib/outline/exam-skills";
 import { buildKnowledgeContext } from "@/lib/knowledge/context-builder";
 import { loadGrammarReference, renderGrammarBlock, type GrammarReference } from "@/lib/knowledge/grammar-reference";
 import { findExemplars, renderExemplarBlock, type CollectionChunk } from "@/lib/knowledge/collections";
@@ -167,6 +169,7 @@ function normalizeLessonProfile(value: unknown, expectedLessonNumber: number): O
   if (!sheet || !address || !Number.isInteger(row) || !Number.isInteger(column) || row <= 0 || column <= 0) {
     throw new GenerationServiceError("大纲来源单元格定位无效");
   }
+  const examSkills = text("examSkills");
   const annotations = normalizeProfileArray(source.annotations, "annotations");
   const mappings = normalizeProfileArray(source.mappings, "mappings");
   const rawValues = source.rawValues && typeof source.rawValues === "object" && !Array.isArray(source.rawValues)
@@ -186,7 +189,9 @@ function normalizeLessonProfile(value: unknown, expectedLessonNumber: number): O
     useOfEnglish: text("useOfEnglish"),
     readingExamType: text("readingExamType"),
     grammar: text("grammar"),
-    examSkills: text("examSkills"),
+    examSkills,
+    // 默认只做一个题型：旧调用方没带 primaryExamSkill 就从完整列表里取第一个
+    primaryExamSkill: text("primaryExamSkill", 500) ?? firstExamSkill(examSkills),
     listening: text("listening"),
     speaking: text("speaking"),
     writing: text("writing"),
@@ -388,7 +393,7 @@ function buildPrompt(
         `核心语法：${profile.grammar || "（大纲未提供，留空）"}`,
         `阅读文章：${profile.reading || "（大纲未提供，留空）"}`,
         `阅读题型：${profile.readingExamType || "（大纲未提供，留空）"}`,
-        `技能训练：${profile.examSkills || "（大纲未提供，留空）"}`,
+        `技能训练：${profile.primaryExamSkill || profile.examSkills || "（大纲未提供，留空）"}`,
         sourceUnit ? `旧版对应讲次：旧第 ${sourceUnit} 讲` : "",
       ]
         .filter(Boolean)
@@ -483,6 +488,12 @@ export async function generateModule(request: GenerationRequest, signal?: AbortS
   throwIfAborted(signal);
   const context = await ensureGenerationContext(request);
   throwIfAborted(signal);
+  // 复习课不产出知识清单：在取骨架、调模型之前就拒绝，给出可读原因
+  if (!bookSupportsLessonType(context.bookType, context.lessonType)) {
+    throw new GenerationServiceError(
+      unsupportedLessonMessage(context.bookType, context.lessonType) ?? "该书种不支持当前课型",
+    );
+  }
   const sourceBookType = request.sourceBookType ?? request.bookType;
   if (request.sourceText?.trim()) {
     if (!request.sourceConfirmed) throw new GenerationServiceError("请先导入已核验的 OCR 来源,再开始生成");
