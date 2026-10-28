@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, FileText, Loader2, Upload } from "lucide-react";
+import { Check, FileText, Loader2, RefreshCw, Upload } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -52,6 +52,7 @@ interface Props {
   /** 本地项目（此前项目名写死在页面常量里，两边对不上就选不到刚识别完的来源）。 */
   /** 已确认的 OCR 来源（资料识别页确认过的），可直接选用。 */
   ocrSources: Array<{ jobId: string; originalName: string; pageCount: number }>;
+  onRefreshSources: () => void;
   onSelectOcrSource: (jobId: string) => void;
   onOutlineFileChange: (file: File) => void;
   onOutlineLessonChange: (lessonKey: string) => void;
@@ -84,6 +85,7 @@ export function WorkbenchLeftPanel({
   failures = {},
   ocrSources,
   onSelectOcrSource,
+  onRefreshSources,
   onOutlineFileChange,
   onOutlineLessonChange,
   onLegacyMarkdownFileChange,
@@ -164,23 +166,35 @@ export function WorkbenchLeftPanel({
                 <label htmlFor="legacySourceFile" className="block text-[10px] font-medium text-ink-2">
                   旧版来源（OCR）
                 </label>
-                {ocrSources.length > 0 && (
+                <div className="flex gap-1">
                   <select
                     value=""
+                    disabled={ocrSources.length === 0}
                     onChange={(event) => {
                       if (event.target.value) onSelectOcrSource(event.target.value);
                       event.currentTarget.value = "";
                     }}
-                    className="h-8 w-full rounded-md border border-line bg-paper px-2 text-[10px] text-ink outline-none focus:border-brand"
+                    className="h-8 min-w-0 flex-1 rounded-md border border-line bg-paper px-2 text-[10px] text-ink outline-none focus:border-brand disabled:text-ink-3"
                   >
-                    <option value="">从资料库选择已确认来源…</option>
+                    <option value="">
+                      {ocrSources.length > 0 ? "从资料库选择已确认来源…" : "还没有已确认来源"}
+                    </option>
                     {ocrSources.map((source) => (
                       <option key={source.jobId} value={source.jobId}>
                         {source.originalName}（{source.pageCount} 页）
                       </option>
                     ))}
                   </select>
-                )}
+                  <button
+                    type="button"
+                    onClick={onRefreshSources}
+                    aria-label="刷新资料库来源"
+                    title="刷新资料库来源"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-md border border-line text-ink-3 transition-colors hover:border-brand/40 hover:text-brand-deep"
+                  >
+                    <RefreshCw className="size-3.5" />
+                  </button>
+                </div>
                 <label className="inline-flex cursor-pointer items-center gap-1 text-[10px] text-ink-3 transition-colors hover:text-brand-deep">
                   <Upload className="size-3" />
                   上传旧版 Markdown

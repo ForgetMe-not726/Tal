@@ -128,6 +128,7 @@ export default function WorkbenchPage() {
   const [projects, setProjects] = React.useState<Array<{ id: string; name: string; grade: string; term: string }>>([]);
   const [projectId, setProjectId] = React.useState("");
   const [ocrSources, setOcrSources] = React.useState<Array<{ jobId: string; originalName: string; pageCount: number }>>([]);
+  const [sourcesEpoch, setSourcesEpoch] = React.useState(0);
   const projectName =
     projects.find((item) => item.id === projectId)?.name ?? `${level} ${TERM_LABEL[term]} 教材`;
   // 换了项目但新列表还没回来时，不要把上一个项目的来源显示出来
@@ -252,20 +253,35 @@ export default function WorkbenchPage() {
     if (!projectId) return;
     let active = true;
     // 来源按整个工作区列：老师不需要按项目切换
-    void fetch(`/api/ocr/sources?bookType=${bookType}`, {
-      cache: "no-store",
-    })
-      .then(async (response) => {
-        const data = (await response.json()) as {
-          sources?: Array<{ jobId: string; originalName: string; pageCount: number }>;
-        };
-        if (active) setOcrSources(data.sources ?? []);
-      })
-      .catch(() => active && setOcrSources([]));
+    const load = () => {
+      void fetch(`/api/ocr/sources?bookType=${bookType}`, { cache: "no-store" })
+        .then(async (response) => {
+          const data = (await response.json()) as {
+            sources?: Array<{ jobId: string; originalName: string; pageCount: number }>;
+          };
+          if (active) setOcrSources(data.sources ?? []);
+        })
+        .catch(() => active && setOcrSources([]));
+    };
+    load();
+    // 老师可能开着制作页去识别页确认来源，再切回本页：窗口重新获得焦点时刷新一次。
+    // （浏览器前进/后退还可能从缓存恢复页面，effect 不重跑，所以也听 pageshow。）
+    const reload = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) load(); // 从 bfcache 恢复：effect 不会重跑
+    };
+    window.addEventListener("focus", reload);
+    window.addEventListener("pageshow", onPageShow);
+    document.addEventListener("visibilitychange", reload);
     return () => {
       active = false;
+      window.removeEventListener("focus", reload);
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", reload);
     };
-  }, [projectId, bookType]);
+  }, [projectId, bookType, sourcesEpoch]);
 
   React.useEffect(() => {
     if (!toast) return;
@@ -384,6 +400,8 @@ export default function WorkbenchPage() {
       const data = (await response.json()) as { profile?: OutlineProfile; error?: string };
       if (!response.ok || !data.profile) throw new Error(data.error ?? "大纲导入失败");
       setOutlineProfile(data.profile);
+      // 导入大纲时顺手刷新一次资料库：老师可能先在识别页确认了新来源
+      setSourcesEpoch((value) => value + 1);
       const firstLesson = data.profile.lessons[0];
       if (firstLesson) applyOutlineLesson(firstLesson, detectedTerm);
       else setToast("大纲已读取，但没有可选择的 Lesson");
@@ -843,6 +861,10 @@ export default function WorkbenchPage() {
         failures={moduleFailures}
         ocrSources={visibleOcrSources}
         onSelectOcrSource={(jobId) => void handleSelectOcrSource(jobId)}
+        onRefreshSources={() => {
+          setSourcesEpoch((value) => value + 1);
+          setToast("已刷新资料库来源");
+        }}
         onOutlineFileChange={(file) => void handleOutlineFileChange(file)}
         onOutlineLessonChange={handleOutlineLessonChange}
         onLegacyMarkdownFileChange={(file) => void handleLegacyMarkdownFileChange(file)}
