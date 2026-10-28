@@ -99,6 +99,7 @@ function testSectionKeyMapping() {
   assert.equal(studentBookSectionKey("Hello World!"), "explore");
 
   assert.equal(studentBookSectionKey("I can"), "objectives");
+  assert.equal(studentBookSectionKey("In this lesson, I can"), "objectives");
   assert.equal(studentBookSectionKey("I CAN"), "objectives");
 
   assert.equal(studentBookSectionKey("Hello Vocabulary"), "say");
@@ -557,6 +558,33 @@ function testRecoveryDoesNotGuess() {
   );
 }
 
+/** 2.0 版把 Unit 1 的 I can 印在单元标题之前：要挪进第 1 讲。 */
+function testLeadingObjectivesBeforeUnitHeading() {
+  const markdown = [
+    "# HELLO ENGLISH",
+    "",
+    "## In this lesson, I can",
+    "",
+    "-- use words related to weather.",
+    "",
+    "-- read an article for detail.",
+    "",
+    "# Unit 1",
+    "",
+    "# Hello Vocabulary",
+    "",
+    "unit one vocabulary",
+  ].join(String.fromCharCode(10));
+  const packages = splitLegacyStudentBookMarkdown(markdown);
+  const unit1 = packages.find((item) => item.sourceLessonNumber === 1);
+  assert.ok(unit1);
+  const objectives = unit1.candidates.find((item) => item.sectionKey === "objectives");
+  assert.ok(objectives, "第 1 讲的 I can 不能丢在前置页里");
+  assert.match(objectives.rawText, /use words related to weather/);
+  assert.doesNotMatch(objectives.rawText, /unit one vocabulary/);
+  assert.equal(unit1.candidates.some((item) => item.sectionKey === "say"), true);
+}
+
 const tests = [
   ["学生用书栏目映射（含 OCR 噪声）", testSectionKeyMapping],
   ["阅读栏目保留整篇课文（回归）", testReadingSectionKeepsTheArticle],
@@ -573,6 +601,7 @@ const tests = [
   ["Hello World 标题丢失时按结构补出 explore（回归）", testRecoversMissingExploreHeading],
   ["补 explore 时不能把 I can 清单也吞进去", testRecoveryKeepsObjectivesList],
   ["结构不符时不猜（I can 后面直接是下一个栏目）", testRecoveryDoesNotGuess],
+  ["Unit 1 的目标清单在单元标题之前（2.0 版）", testLeadingObjectivesBeforeUnitHeading],
 ];
 
 for (const [name, test] of tests) {

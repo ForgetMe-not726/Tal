@@ -63,27 +63,44 @@ function testKnowledgeObjectivesStillResolves() {
 }
 
 /**
- * 学生用书的课时目标也走确定性分支。
+ * 学生用书的课时目标优先取旧版 `I can` 清单（精准迁移）。
  *
- * 它同时有 deterministic 和旧版 `I can` 栏目——确定性分支必须优先，
- * 否则被记成"来源"的会是旧版块，而内容其实是大纲算出来的。
+ * 2026-10-28 需求方指正：大纲的主题列常是中文说明，直接拿来拼英文目标页
+ * 会把中文搬进教材。旧版清单是已经人工确认的英文能力描述，应优先。
  */
-function testStudentObjectivesPrefersOutline() {
+function testStudentObjectivesPrefersLegacyIcan() {
   const studentObjectives = findModuleOutline("student", "learning_objectives");
   assert.equal(studentObjectives.deterministic, "objectives_lesson_page");
   assert.deepEqual(studentObjectives.sourceSections, ["objectives"]);
 
+  const legacy = [
+    "## In this lesson, I can",
+    "",
+    "-- use question tags.",
+    "",
+    "-- read a magazine article.",
+  ].join(String.fromCharCode(10));
   const text = selectSourceText(
     base({
       module: studentObjectives,
       outlineLesson: OUTLINE_LESSON,
       hasLegacyPackages: true,
-      candidates: [candidate("objectives", "I can use question tags")],
+      candidates: [candidate("objectives", legacy)],
     }),
   );
-  assert.ok(text);
-  assert.match(text, /Question tags/);
-  assert.doesNotMatch(text, /I can use question tags/, "确定性模块的来源应是大纲，不是旧版块");
+  assert.equal(text, legacy, "有旧版 I can 时用它，不再用大纲中文主题");
+
+  // 没有旧版清单时才退回大纲
+  const fallback = selectSourceText(
+    base({
+      module: studentObjectives,
+      outlineLesson: OUTLINE_LESSON,
+      hasLegacyPackages: false,
+      candidates: [],
+    }),
+  );
+  assert.ok(fallback);
+  assert.match(fallback, /核心词汇：charm, inhabitant/);
 }
 
 /** 大纲字段为空时不编造。 */
@@ -217,7 +234,7 @@ function testMissingSourceMessageExplainsWhy() {
 
 const tests = [
   ["知识清单学习目标在导入 OCR 后仍可生成（回归）", testKnowledgeObjectivesStillResolves],
-  ["学生用书课时目标优先用大纲（不被旧版块冒充来源）", testStudentObjectivesPrefersOutline],
+  ["学生用书课时目标优先用旧版 I can 清单", testStudentObjectivesPrefersLegacyIcan],
   ["大纲字段缺失时不编造", testOutlineSourceTextSkipsMissingFields],
   ["按目录栏目取来源且顺序正确", testSectionsAreCollectedInOrder],
   ["缺栏目时返回 null 而不是静默兜底", testMissingSectionReturnsNull],

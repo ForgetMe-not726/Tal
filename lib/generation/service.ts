@@ -564,13 +564,22 @@ export async function generateModule(request: GenerationRequest, signal?: AbortS
     })
   ).chunks;
   throwIfAborted(signal);
-  // 课时目标来自大纲，不依赖旧版来源，因此不要求检索到内容。
+  // 课时目标不调模型：学生用书优先用旧版 I can 清单，知识清单用大纲字段。
   const deterministic =
     outline.deterministic && request.lessonProfile
       ? buildDeterministicObjectives(outline.deterministic, request.lessonProfile, {
           revision: context.lessonType === "revision",
+          sourceText: request.sourceText,
         })
       : null;
+  // 确定性模块不能悄悄退回模型去“翻译”大纲；没有可用事实就明确报错
+  if (outline.deterministic && !deterministic) {
+    throw new GenerationServiceError(
+      outline.deterministic === "objectives_lesson_page"
+        ? "课时目标没有可用内容：旧版学生用书缺少「I can」清单，大纲字段也没有可用的英文项"
+        : "课时目标没有可用内容：大纲的目标词汇、语法、阅读和技能均为空",
+    );
+  }
   if (retrievalResult.entries.length === 0 && !deterministic) {
     throw new GenerationServiceError("没有找到已确认的结构化来源;请先导入并确认来源模块及映射");
   }
@@ -635,7 +644,9 @@ export async function generateModule(request: GenerationRequest, signal?: AbortS
       text: markdown,
       metadata: { sourceAnnotations: knowledgeContext.sourceRefs, sourceConfirmed: true },
     }),
-    ...checkVocabularyCoverage(markdown, request.lessonProfile?.coreVocabulary),
+    // 课时目标是“目标清单”，本来就不该覆盖全部核心词汇；对确定性模块做词汇覆盖检查
+    // 只会每课报一次假阳性（实测一次报 14 个词全缺）。
+    ...(deterministic ? [] : checkVocabularyCoverage(markdown, request.lessonProfile?.coreVocabulary)),
   ];
   const hardIssues = hardRuleIssues(ruleSet, checks);
   if (hardIssues.length > 0) {

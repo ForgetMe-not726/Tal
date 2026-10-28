@@ -105,13 +105,20 @@ export function missingSourceMessage(input: {
 export function selectSourceText(input: SourceSelectionInput): string | null {
   const sections = input.module?.sourceSections ?? [];
 
-  // 1. 确定性模块（两个书种的课时目标）的内容由大纲算出，**从不来自旧版材料**，
-  //    所以来源就是大纲本身。判据是 deterministic，不是 sourceSections——见文件头注释。
+  // 1. 确定性模块（两个书种的课时目标）。
   //
-  //    放在最前面是有意的：学生用书的课时目标同时有 deterministic 和旧版 `I can` 栏目，
-  //    若让旧版分支先命中，被记成"来源"的会是旧版块，与内容的实际来路不符。
-  //    旧版 `I can` 仍可通过 ModuleMapping 关联，只是不冒充来源。
+  //    学生用书的课时目标优先取旧版 `I can` / `In this lesson, I can` 清单：
+  //    那是旧书里已经确认过的能力描述，属于**精准迁移**；部门大纲的主题列常是
+  //    中文说明，只能当参考，不能直接写进英文目标页（需求方 2026-10-28 指正）。
+  //    知识清单的学习目标是「字段 + 内容」表，内容本来就来自大纲，继续用大纲。
   if (input.module?.deterministic && input.outlineLesson) {
+    if (input.module.deterministic === "objectives_lesson_page") {
+      const objectives = input.candidates
+        .filter((candidate) => candidate.sectionKey === "objectives")
+        .map((candidate) => candidate.rawText)
+        .filter(Boolean);
+      if (objectives.length > 0) return objectives.join(String.fromCharCode(10, 10));
+    }
     return outlineSourceText(input.outlineLesson);
   }
 

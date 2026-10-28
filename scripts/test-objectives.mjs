@@ -3,6 +3,7 @@ import {
   buildDeterministicObjectives,
   buildLessonObjectivesMarkdown,
   buildObjectivesMarkdown,
+  extractIcanStatements,
 } from "../lib/generation/objectives.ts";
 
 const FULL_PROFILE = {
@@ -27,24 +28,56 @@ function testKnowledgeObjectivesTable() {
   assert.equal(buildObjectivesMarkdown({ coreVocabulary: "", grammar: null, reading: "  ", examSkills: null }), null);
 }
 
-/** 学生用书常规课：四条目标，句式照成稿。 */
+/** 学生用书常规课：优先迁移旧版 I can；没有时退回大纲，但不搬中文。 */
 function testStudentLessonPageRegular() {
-  const markdown = buildLessonObjectivesMarkdown(FULL_PROFILE);
-  const lines = markdown.split("\n").filter((line) => line.startsWith("- "));
-  assert.equal(lines.length, 4);
-  assert.equal(lines[0], "- learn words about 关于世界各地市场的特点与各国特色市集");
-  assert.equal(lines[1], "- read the article Beautiful villages");
-  assert.equal(lines[2], "- learn the grammar of 反身代词");
-  assert.equal(lines[3], "- practise the use of Listening Part 3");
-  assert.match(markdown, /^## In this lesson, we will\.\.\./);
+  // 旧版 I can 清单：一行里两条也要拆开；OCR 的写法差异不做猜测性修补
+  const legacy = [
+    "## In this lesson, I can",
+    "",
+    "-- use words about markets.",
+    "",
+    "-- read a magazine article for detail. - use question tags.",
+  ].join(String.fromCharCode(10));
+  const migrated = buildLessonObjectivesMarkdown(FULL_PROFILE, { sourceText: legacy });
+  assert.deepEqual(
+    migrated.split(String.fromCharCode(10)).filter((line) => line.startsWith("- ")),
+    ["- use words about markets.", "- read a magazine article for detail.", "- use question tags."],
+  );
 
-  // 字段为空时整条省略，不留空行
-  const partial = buildLessonObjectivesMarkdown({ ...FULL_PROFILE, reading: null, examSkills: null });
-  assert.equal(partial.split("\n").filter((line) => line.startsWith("- ")).length, 2);
-  assert.doesNotMatch(partial, /read the article/);
+  // 没有旧版清单时退回大纲字段；含中文的主题/语法一律跳过
+  const fallback = buildLessonObjectivesMarkdown(FULL_PROFILE);
+  assert.deepEqual(
+    fallback.split(String.fromCharCode(10)).filter((line) => line.startsWith("- ")),
+    ["- read the article Beautiful villages", "- practise the use of Listening Part 3"],
+  );
+  assert.doesNotMatch(fallback, /[㐀-鿿]/u, "英文目标页不能出现中文");
 
   // 全空 → 不生成
-  assert.equal(buildLessonObjectivesMarkdown({ theme: "", coreVocabulary: "", reading: "", grammar: "", examSkills: "" }), null);
+  assert.equal(
+    buildLessonObjectivesMarkdown({ theme: "", coreVocabulary: "", reading: "", grammar: "", examSkills: "" }),
+    null,
+  );
+}
+
+/** I can 抽取：去掉标题/注释/项目符号，过滤中文，保留原文（不做 OCR 猜测性修补）。 */
+function testExtractIcanStatements() {
+  const text = [
+    "## In this lesson, I can",
+    "",
+    "<!-- image: x.jpg -->",
+    "-- usewords related to weather and natural phenomena.",
+    "-- usethe zero and first conditional.",
+    "-- read a magazine article for general idea and for detail.",
+    "-- 中文说明不应进入英文目标",
+    "",
+  ].join(String.fromCharCode(10));
+  assert.deepEqual(extractIcanStatements(text), [
+    "use words related to weather and natural phenomena.",
+    "use the zero and first conditional.",
+    "read a magazine article for general idea and for detail.",
+  ]);
+  assert.deepEqual(extractIcanStatements(null), []);
+  assert.deepEqual(extractIcanStatements("I can use question tags."), ["use question tags."]);
 }
 
 /**
@@ -88,7 +121,8 @@ function testDispatch() {
 
 const tests = [
   ["知识清单学习目标表", testKnowledgeObjectivesTable],
-  ["学生用书常规课四条目标", testStudentLessonPageRegular],
+  ["学生用书常规课：优先旧版 I can，不搬中文", testStudentLessonPageRegular],
+  ["I can 清单抽取", testExtractIcanStatements],
   ["学生用书复习课三条固定目标（大纲为空也出）", testStudentLessonPageRevision],
   ["按目录的 deterministic 分派", testDispatch],
 ];

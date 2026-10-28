@@ -95,8 +95,9 @@ export function studentBookSectionKey(
 ): LegacySectionKey {
   const n = heading.toLowerCase().replace(/[^a-z]/g, "");
 
-  // 「I can」是本课能做到的能力描述 → 新版主题页的课时目标
-  if (n === "ican") return "objectives";
+  // 「I can」是本课能做到的能力描述 → 新版主题页的课时目标。
+  // 旧版是 `## I can`；2.0 版教材写成 `## In this lesson, I can`，两者都要认。
+  if (n === "ican" || n === "inthislessonican") return "objectives";
   // 「Did you know…?」+「Hello World」都是话题引入的科普短文 → Let's explore!
   //
   // 但 `DID YOU KNOW?` 也是**栏目内部的杂志小标题**：实测学生用书 Unit 3 的
@@ -206,13 +207,34 @@ function recoverExploreSection(input: {
   }];
 }
 
+/**
+ * 2.0 版学生用书把第 1 单元的 `In this lesson, I can` 印在单元标题之前
+ * （OCR 顺序是：目标页 → `# Unit 1`）。不挪进来的话，第 1 课的 I can 清单
+ * 会落在前置页里解析不到，生成课时目标时又退回大纲的中文主题。
+ * 其余单元的目标页都在标题之后，只处理第一个单元前的这一块。
+ */
+function hoistLeadingObjectives(markdown: string): string {
+  const lesson = /^#{1,2}\s*(?:UNIT\s*\d+|第\s*\d+\s*讲)[^\n]*$/imu.exec(markdown);
+  if (!lesson) return markdown;
+  const head = markdown.slice(0, lesson.index);
+  const objectives = /^#{1,2}\s*In this lesson,?\s*I can[^\n]*$/imu.exec(head);
+  if (!objectives) return markdown;
+  const block = markdown.slice(objectives.index, lesson.index).trim();
+  if (!block) return markdown;
+  const rest = markdown.slice(lesson.index);
+  const newline = rest.indexOf("\n");
+  const headingLine = newline === -1 ? rest : rest.slice(0, newline);
+  const tail = newline === -1 ? "" : rest.slice(newline + 1);
+  return `${markdown.slice(0, objectives.index)}${headingLine}\n\n${block}\n${tail}`;
+}
+
 export function splitLegacyStudentBookMarkdown(
   markdown: string,
   options: SplitLegacyOptions = {},
 ): LegacyLessonPackage[] {
   const sourceOnlyUnits = options.sourceOnlyLessons ?? DEFAULT_SOURCE_ONLY_UNITS;
   return splitIntoPackages(
-    withoutBookWordList(markdown),
+    hoistLeadingObjectives(withoutBookWordList(markdown)),
     LESSON_HEADING,
     studentBookSectionKey,
     (lessonNumber, key) => sourceOnlyUnits.includes(lessonNumber) || SOURCE_ONLY_SECTIONS.includes(key),
