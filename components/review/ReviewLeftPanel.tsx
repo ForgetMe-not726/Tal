@@ -97,19 +97,17 @@ export function ReviewLeftPanel({
     <aside className="flex h-full w-[280px] shrink-0 flex-col overflow-y-auto border-r border-line bg-paper">
       <div className="border-b border-line px-4 py-2.5">
         <h2 className="text-sm font-semibold tracking-tight">教材审校</h2>
-        <p className="mt-0.5 text-[10px] leading-relaxed text-ink-3">
-          审的是**已保存的版本**；结论需人工复核后才作数
-        </p>
+        <p className="mt-0.5 text-[10px] text-ink-3">审已保存的版本</p>
       </div>
 
       <div className="flex flex-col gap-2.5 px-3 py-3">
-        <section className="space-y-1.5 rounded-md border border-line bg-canvas/40 p-2.5">
+        <section className="space-y-1.5 border-b border-line pb-2.5">
           <label htmlFor="project" className="block text-xs font-medium text-ink-2">本地项目</label>
           <select id="project" value={projectId} onChange={(event) => onProjectChange(event.target.value)} className={selectClass}>
             <option value="">选择项目…</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
-                {project.name} · {project.grade} · {project.term}
+                {project.name}
               </option>
             ))}
           </select>
@@ -130,7 +128,7 @@ export function ReviewLeftPanel({
           </select>
         </section>
 
-        <section className="space-y-1.5 rounded-md border border-line bg-canvas/40 p-2.5">
+        <section className="space-y-1.5 border-b border-line pb-2.5">
           <label htmlFor="scope" className="block text-xs font-medium text-ink-2">审校范围</label>
           <select
             id="scope"
@@ -227,7 +225,7 @@ export function ReviewLeftPanel({
 
         {/* 筛选：按书种、处理状态、有无正文定位（PRODUCT.md §4.3 要求可筛选） */}
         {manifest && (
-          <section className="space-y-1.5 rounded-md border border-line bg-canvas/40 p-2.5">
+          <section className="space-y-1.5 border-b border-line pb-2.5">
             <span className="block text-xs font-medium text-ink-2">筛选问题</span>
             <select
               value={filters.bookType}

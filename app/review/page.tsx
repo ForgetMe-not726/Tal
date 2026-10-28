@@ -361,7 +361,9 @@ export default function ReviewPage() {
     : !lessonNumber
       ? "这一课还没有内容"
       : scope === "module" && !moduleKey
-        ? "选择要审的模块"
+        ? availableModules.length === 0
+          ? ""
+          : "选择要审的模块"
         : "";
 
   return (
@@ -460,9 +462,7 @@ export default function ReviewPage() {
                       highlightQuote={selectedFinding?.anchor.quote ?? null}
                     />
                   ) : (
-                    <p className="py-16 text-center text-xs text-ink-3">
-                      左侧选一次审校任务，这里显示被审的那一版正文。
-                    </p>
+                    <p className="py-16 text-center text-xs text-ink-3">左侧开始审校后，这里显示正文</p>
                   )}
                 </div>
               </div>

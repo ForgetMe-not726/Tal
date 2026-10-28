@@ -141,35 +141,6 @@ export function RuleLibrary({ initialRules, initialError }: RuleLibraryProps) {
 
   return (
     <div className="mt-4">
-      <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-line bg-paper px-4 py-3 shadow-sm">
-        <div>
-          <p className="text-sm font-medium text-ink">规则文件导入</p>
-          <p className="mt-0.5 text-xs text-ink-3">
-            上传已确认的 Markdown，解析后直接生效；每个文件显示为一条，展开可查看其中的规则。
-          </p>
-        </div>
-        <label
-          className={cn(
-            "inline-flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md bg-brand px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-brand-deep",
-            (busy || rules === null) && "pointer-events-none opacity-60",
-          )}
-        >
-          {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-          添加规则
-          <input
-            type="file"
-            accept=".md,.markdown,text/markdown"
-            className="sr-only"
-            disabled={busy || rules === null}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void handleImport(file);
-              event.currentTarget.value = "";
-            }}
-          />
-        </label>
-      </div>
-
       {rules === null && !loadError && (
         <div className="flex items-center gap-2 rounded-lg border border-line bg-paper px-4 py-6 text-sm text-ink-2 shadow-sm">
           <Loader2 className="size-4 animate-spin text-brand" />
@@ -187,11 +158,31 @@ export function RuleLibrary({ initialRules, initialError }: RuleLibraryProps) {
 
       {rules !== null && !loadError && (
         <div className="overflow-hidden rounded-lg border border-line bg-paper shadow-sm">
-          {groups.length === 0 && (
-            <p className="px-4 py-8 text-center text-sm text-ink-3">
-              规则库为空，请点击右上角“添加规则”上传 Markdown。
-            </p>
-          )}
+          <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
+            <span className="text-xs text-ink-3">
+              {groups.length > 0 ? `${groups.length} 个规则文件` : "规则库为空"}
+            </span>
+            <label
+              className={cn(
+                "inline-flex shrink-0 cursor-pointer items-center gap-1 rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-ink-2 transition-colors hover:border-brand/40 hover:text-brand-deep",
+                busy && "pointer-events-none opacity-60",
+              )}
+            >
+              {busy ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+              导入
+              <input
+                type="file"
+                accept=".md,.markdown,text/markdown"
+                className="sr-only"
+                disabled={busy}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void handleImport(file);
+                  event.currentTarget.value = "";
+                }}
+              />
+            </label>
+          </div>
           <ul className="divide-y divide-line">
             {groups.map((group) => {
               const isOpen = expanded[group.file] ?? false;
@@ -223,10 +214,11 @@ export function RuleLibrary({ initialRules, initialError }: RuleLibraryProps) {
                       type="button"
                       disabled={busy}
                       onClick={() => void handleDeleteFile(group.file, group.rules)}
-                      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-proof/40 px-2 py-1.5 text-xs font-medium text-proof hover:bg-proof/10 disabled:cursor-not-allowed disabled:opacity-50"
+                      aria-label={`删除规则文件 ${group.file}`}
+                      title="删除规则文件"
+                      className="flex size-7 shrink-0 items-center justify-center rounded-md text-ink-3 transition-colors hover:bg-proof/10 hover:text-proof disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <Trash2 className="size-3.5" />
-                      删除规则
                     </button>
                   </div>
 

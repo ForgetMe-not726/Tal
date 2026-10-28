@@ -87,7 +87,6 @@ export function AssistantPanel() {
   }
 
   const hits = result?.hits ?? [];
-  const searched = result?.searched;
 
   return (
     <section className="rounded-lg border border-line bg-paper p-5 shadow-sm">
@@ -96,9 +95,12 @@ export function AssistantPanel() {
           <Search className="size-4 text-brand" />
           通用助手
         </h2>
-        <span className="flex items-center gap-1 text-[10px] text-ink-3">
+        <span
+          className="flex shrink-0 items-center gap-1 text-[10px] text-ink-3"
+          title="只读：不会改动教材、规则或审校结果"
+        >
           <ShieldCheck className="size-3" />
-          只读：帮你找到资料，不会改动教材、规则或审校结果
+          只读
         </span>
       </div>
 
@@ -125,7 +127,7 @@ export function AssistantPanel() {
           <option value="">全工作区</option>
           {projects.map((project) => (
             <option key={project.id} value={project.id}>
-              {project.name} · {project.grade} · {project.term}
+              {project.name}
             </option>
           ))}
         </select>
@@ -162,13 +164,7 @@ export function AssistantPanel() {
         <div className="mt-4 space-y-2">
           {hits.length === 0 ? (
             <div className="rounded-md border border-dashed border-ink-3/50 px-3 py-6 text-center text-xs leading-relaxed text-ink-3">
-              <p>未在当前本地资料中找到。</p>
-              {searched && (
-                <p className="mt-1">
-                  已搜索：{searched.projects} 个项目 · {searched.lessons} 个 Lesson · {searched.entries} 条来源 ·{" "}
-                  {searched.rules} 条规则 · {searched.versions} 个模块版本 · {searched.references} 份参考资料
-                </p>
-              )}
+              没有找到相关本地资料。
             </div>
           ) : (
             hits.map((hit) => <HitCard key={`${hit.kind}-${hit.sourceRef}-${hit.pageIndex ?? "x"}`} hit={hit} />)
@@ -184,12 +180,6 @@ export function AssistantPanel() {
         </ul>
       )}
 
-      {!result && (
-        <p className="mt-4 text-[11px] leading-relaxed text-ink-3">
-          在这里按自然语言找资料：旧版教材、规则、当前项目正文和参考资料都会被搜到。
-          结果会给出书名、Lesson、模块与页码，能点开原页核对。
-        </p>
-      )}
     </section>
   );
 }

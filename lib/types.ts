@@ -148,7 +148,7 @@ export interface AiDiagnosticsView {
 }
 
 export interface FlowUnit {
-  id: "make" | "review" | "retrieve";
+  id: "recognize" | "make" | "review";
   title: string;
   desc: string;
   accent: "brand" | "spot" | "neutral";

@@ -27,22 +27,24 @@ export function plateLetter(index: number): string {
 
 export const FLOW_UNITS: FlowUnit[] = [
   {
+    id: "recognize",
+    title: "资料识别",
+    desc: "识别 PDF、图片为本地来源",
+    accent: "neutral",
+    href: "/recognize",
+  },
+  {
     id: "make",
-    title: "制作教材",
-    desc: "配置层级与书种，按模块生成结构化教材内容",
+    title: "教材制作",
+    desc: "按大纲与模块生成四书内容",
     accent: "brand",
     href: "/workbench",
   },
   {
     id: "review",
-    title: "审校教材",
-    desc: "按审校规则对成稿做红笔批注与修订",
+    title: "教材审校",
+    desc: "按规则查错，人工确认后出报告",
     accent: "spot",
-  },
-  {
-    id: "retrieve",
-    title: "知识库检索",
-    desc: "从结构化知识库召回并引用相关素材",
-    accent: "neutral",
+    href: "/review",
   },
 ];

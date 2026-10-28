@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, FileText, Loader2 } from "lucide-react";
+import { Check, FileText, Loader2, Upload } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -27,7 +27,7 @@ function sourceUnitLabel(lesson: OutlineLessonProfile): string {
   const annotated = lesson.mappings.filter((mapping) => mapping.legacySourceUnit);
   const unit = sourceUnitForTargetLesson(lesson);
   if (!unit) return "未确定";
-  return annotated.length > 0 ? `旧第 ${unit} 讲（大纲标注）` : `旧第 ${unit} 讲（默认一一对应）`;
+  return annotated.length > 0 ? `旧第 ${unit} 讲（大纲标注）` : `旧第 ${unit} 讲`;
 }
 
 interface Props {
@@ -103,37 +103,44 @@ export function WorkbenchLeftPanel({
   return (
     <aside className="flex h-full w-[280px] shrink-0 flex-col overflow-y-auto border-r border-line bg-paper">
       <div className="border-b border-line px-4 py-2.5">
-        <h2 className="text-sm font-semibold tracking-tight">迁移参数</h2>
-        {aiDiagnostics && (
-          <p className="mt-0.5 truncate text-[10px] text-ink-3">
-            {aiDiagnostics.provider === "mock"
-              ? "AI：Mock 联调"
-              : aiDiagnostics.configured
-                ? "AI：已配置"
-                : "AI：未配置"}
+        <h2 className="text-sm font-semibold tracking-tight">课时设置</h2>
+        {/* 只在 AI 不可用时提示；已配置是常态，不占一行 */}
+        {aiDiagnostics && (aiDiagnostics.provider === "mock" || !aiDiagnostics.configured) && (
+          <p className="mt-0.5 truncate text-[10px] text-amber-700">
+            {aiDiagnostics.provider === "mock" ? "AI：Mock 联调" : "AI：未配置"}
           </p>
         )}
       </div>
 
       <div className="flex flex-col gap-2.5 px-3 py-3">
-        <section className="space-y-1.5 rounded-md border border-line bg-canvas/40 p-2.5">
+        <section className="space-y-1.5 border-b border-line pb-2.5">
           <label htmlFor="outlineFile" className="block text-xs font-medium text-ink-2">部门大纲</label>
-          <input
-            id="outlineFile"
-            type="file"
-            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            disabled={outlineLoading}
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) onOutlineFileChange(file);
-              event.currentTarget.value = "";
-            }}
-            className="block w-full text-[10px] text-ink-3 file:mr-2 file:rounded file:border-0 file:bg-brand-tint file:px-2 file:py-1 file:text-[10px] file:font-medium file:text-brand-deep"
-          />
-          {outlineLoading && <p className="text-[10px] text-brand">正在读取大纲…</p>}
-          {outlineFileName && !outlineLoading && (
-            <p className="truncate text-[10px] text-ink-3" title={outlineFileName}>{outlineFileName}</p>
-          )}
+          <label
+            htmlFor="outlineFile"
+            className={cn(
+              "flex cursor-pointer items-center justify-center gap-1.5 rounded-md border border-dashed border-line bg-paper px-2 py-2 text-[11px] text-ink-2 transition-colors",
+              "hover:border-brand/50 hover:text-brand-deep",
+              outlineLoading && "pointer-events-none opacity-60",
+            )}
+            title={outlineFileName ?? "选择 .xlsx 部门大纲"}
+          >
+            {outlineLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+            <span className="max-w-[190px] truncate">
+              {outlineLoading ? "正在读取…" : (outlineFileName ?? "选择大纲文件")}
+            </span>
+            <input
+              id="outlineFile"
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              disabled={outlineLoading}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) onOutlineFileChange(file);
+                event.currentTarget.value = "";
+              }}
+              className="sr-only"
+            />
+          </label>
 
           {outlineProfile && (
             <>
@@ -174,17 +181,21 @@ export function WorkbenchLeftPanel({
                     ))}
                   </select>
                 )}
-                <input
-                  id="legacySourceFile"
-                  type="file"
-                  accept=".md,.txt"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) onLegacyMarkdownFileChange(file);
-                    event.currentTarget.value = "";
-                  }}
-                  className="block w-full text-[10px] text-ink-3 file:mr-2 file:rounded file:border-0 file:bg-brand-tint file:px-2 file:py-1 file:text-[10px] file:font-medium file:text-brand-deep"
-                />
+                <label className="inline-flex cursor-pointer items-center gap-1 text-[10px] text-ink-3 transition-colors hover:text-brand-deep">
+                  <Upload className="size-3" />
+                  上传旧版 Markdown
+                  <input
+                    id="legacySourceFile"
+                    type="file"
+                    accept=".md,.txt"
+                    className="sr-only"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) onLegacyMarkdownFileChange(file);
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                </label>
               </div>
 
               {outlineProfile.issues.length > 0 && (

@@ -20,6 +20,7 @@ import { moduleOrdinal } from "@/lib/markdown/heading-levels";
 import { applySuggestionToMarkdown, type ApplyFailureReason } from "@/lib/suggestions/apply";
 import { TERM_LABEL } from "@/lib/types";
 import { inferLessonType } from "@/lib/curriculum";
+import { detectTerm } from "@/lib/ocr/naming";
 import type { AiDiagnosticsView, BlockCheck, ContentSuggestion, BookTypeId, ExportFormat, GeneratedBlock, LegacyLessonPackage, LegacySectionKey, LessonType, Level, ModuleDef, ModuleVersionSummary, OutlineLessonProfile, OutlineProfile, Term, WorkbenchSuggestion } from "@/lib/types";
 
 /**
@@ -295,14 +296,14 @@ export default function WorkbenchPage() {
     setFileName(makeFileName(nextLevel, nextBookType, nextLessonNumber, nextTitle));
   }
 
-  function applyOutlineLesson(lesson: OutlineLessonProfile) {
+  function applyOutlineLesson(lesson: OutlineLessonProfile, termValue: Term = term) {
     resetDocument();
     setSelectedLessonKey(lesson.lessonKey);
     setLessonNumber(lesson.lessonNumber);
     setLessonTitle(lesson.title || lesson.targetTitle || `Lesson ${lesson.lessonNumber}`);
     // 课型按学期课次自动判定（春/秋 5、10、15，夏/冬 7），老师仍可手动改
     setLessonType(
-      inferLessonType({ term, lessonNumber: lesson.lessonNumber, title: lesson.title }),
+      inferLessonType({ term: termValue, lessonNumber: lesson.lessonNumber, title: lesson.title }),
     );
     updateFileName(level, bookType, lesson.lessonNumber, lesson.title || lesson.targetTitle);
   }
@@ -369,6 +370,13 @@ export default function WorkbenchPage() {
     setLegacyPackages([]);
     setLegacySourceFileName(null);
     setOutlineFileName(file.name);
+    // 大纲文件名通常写明学期（春季…、寒假…）：先切换学期，避免“寒假”配“春季大纲”
+    const detectedTerm = detectTerm(file.name) ?? term;
+    if (detectedTerm !== term) {
+      setProjects([]);
+      setProjectId("");
+      setTerm(detectedTerm);
+    }
     try {
       const form = new FormData();
       form.append("file", file);
@@ -377,7 +385,7 @@ export default function WorkbenchPage() {
       if (!response.ok || !data.profile) throw new Error(data.error ?? "大纲导入失败");
       setOutlineProfile(data.profile);
       const firstLesson = data.profile.lessons[0];
-      if (firstLesson) applyOutlineLesson(firstLesson);
+      if (firstLesson) applyOutlineLesson(firstLesson, detectedTerm);
       else setToast("大纲已读取，但没有可选择的 Lesson");
       if (data.profile.issues.length > 0) {
         setToast(`大纲已导入；有 ${data.profile.issues.length} 项单元格待确认`);

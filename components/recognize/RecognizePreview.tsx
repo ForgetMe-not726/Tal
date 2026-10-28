@@ -54,12 +54,14 @@ export function RecognizePreview({
     <div className="flex min-w-0 flex-1 flex-col">
       <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-line bg-paper px-3">
         <span className="text-xs font-medium text-ink-2">
-          原页 {page ? `第 ${page.index + 1} 页` : "—"}
+          原页{page ? ` · 第 ${page.index + 1} 页` : ""}
         </span>
-        <span className="text-[10px] text-ink-3">
-          {pageBlocks.length} 个块
-          {page && page.width > 0 ? ` · ${Math.round(page.width)}×${Math.round(page.height)} pt` : ""}
-        </span>
+        {page && (
+          <span className="text-[10px] text-ink-3">
+            {pageBlocks.length} 个块
+            {page.width > 0 ? ` · ${Math.round(page.width)}×${Math.round(page.height)} pt` : ""}
+          </span>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto bg-canvas p-4">

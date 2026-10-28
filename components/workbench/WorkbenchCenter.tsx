@@ -239,7 +239,7 @@ function EmptyState() {
       <div className="w-full max-w-sm rounded-md border border-dashed border-ink-3/50 px-6 py-12 text-center">
         <RegistrationMark className="mx-auto size-6 text-ink-3" />
         <p className="mt-3 text-sm font-medium text-ink-2">正文区为空</p>
-        <p className="mt-1 text-xs text-ink-3">导入大纲和旧版材料后，从右侧点“生成整课初稿”</p>
+        <p className="mt-1 text-xs text-ink-3">导入大纲与旧版材料后，点左侧模块开始生成</p>
       </div>
     </div>
   );

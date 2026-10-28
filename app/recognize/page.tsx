@@ -337,15 +337,7 @@ export default function RecognizePage() {
           packages={packages}
           warnings={warnings}
         />
-      ) : (
-        <div className="flex h-full w-[440px] shrink-0 items-center justify-center border-l border-line bg-paper px-6">
-          <p className="text-center text-xs leading-relaxed text-ink-3">
-            选一个识别任务，或导入一份教材 PDF。
-            <br />
-            识别完成后在这里核对正文、切分与来源。
-          </p>
-        </div>
-      )}
+      ) : null}
 
       {toast && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-md bg-chrome px-4 py-2 text-sm text-paper shadow-paper animate-in fade-in-0 zoom-in-95">

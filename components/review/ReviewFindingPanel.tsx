@@ -71,10 +71,12 @@ export function ReviewFindingPanel({
   return (
     <div className="flex h-full w-[360px] shrink-0 flex-col border-l border-line bg-paper">
       <div className="border-b border-line px-4 py-2.5">
-        <h2 className="text-sm font-semibold tracking-tight">问题与处理</h2>
-        <p className="mt-0.5 text-[10px] leading-relaxed text-ink-3">
-          {findings.length} 条待看 · 采用建议只改当前草稿，保存后才生成新版本
-        </p>
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="text-sm font-semibold tracking-tight">问题与处理</h2>
+          {findings.length > 0 && (
+            <span className="text-[10px] text-ink-3">{findings.length} 条待看</span>
+          )}
+        </div>
       </div>
 
       {/* 清单：点一条跳到正文对应位置 */}
@@ -127,7 +129,7 @@ export function ReviewFindingPanel({
             </p>
             {!finding.anchor.quote && (
               <p className="text-[10px] text-ink-3">
-                无正文定位（这类结论通常是「某处缺内容」，也可能是模型看错了——请对照原稿核对）
+                无正文定位，请对照原稿核对
               </p>
             )}
             {finding.anchor.quote && (
@@ -234,14 +236,13 @@ export function ReviewFindingPanel({
               )}
             </div>
           </div>
-        ) : (
-          <p className="mt-8 text-center text-[11px] leading-relaxed text-ink-3">
-            左侧选一条问题查看依据与建议。
-          </p>
-        )}
+        ) : findings.length > 0 ? (
+          <p className="mt-8 text-center text-[11px] text-ink-3">选一条问题查看依据</p>
+        ) : null}
       </div>
 
-      {/* 主操作按阶段变化：开始审校（在左栏）→ 生成报告 → 查看报告 */}
+      {/* 主操作按阶段变化：开始审校（在左栏）→ 生成报告 → 查看报告；没有审校结果时不占位 */}
+      {jobStatus === "ready" && (
       <div className="flex shrink-0 items-center gap-2 border-t border-line px-3 py-2.5">
         <button
           type="button"
@@ -264,6 +265,7 @@ export function ReviewFindingPanel({
           {viewingReport ? "返回正文" : "查看报告"}
         </button>
       </div>
+      )}
     </div>
   );
 }

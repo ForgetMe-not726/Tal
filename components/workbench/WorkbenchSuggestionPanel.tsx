@@ -62,11 +62,9 @@ export function WorkbenchSuggestionPanel({
       <div className="border-b border-line px-4 py-3">
         <h2 className="flex items-center gap-2 text-sm font-semibold tracking-tight">
           <MessageSquarePlus className="size-4 text-brand" />
-          修改及替换建议
+          修改建议
         </h2>
-        <p className="mt-1 text-[11px] leading-relaxed text-ink-3">
-          建议只进入右栏，不会自动覆盖正文；采用后仍需保存新版本。
-        </p>
+        <p className="mt-1 text-[10px] text-ink-3">只改草稿，保存后生成新版本</p>
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4">

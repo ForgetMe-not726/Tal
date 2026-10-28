@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, ClipboardCheck, Database, FilePlus2 } from "lucide-react";
+import { ArrowRight, ClipboardCheck, FilePlus2, ScanText } from "lucide-react";
 import { AssistantPanel } from "@/components/assistant/AssistantPanel";
 import { RuleLibrary } from "@/components/console/RuleLibrary";
 import { listRulesWithVersions } from "@/lib/rules/service";
@@ -11,9 +11,9 @@ import { cn } from "@/lib/utils";
 export const dynamic = "force-dynamic";
 
 const ICONS = {
+  recognize: ScanText,
   make: FilePlus2,
   review: ClipboardCheck,
-  retrieve: Database,
 } as const;
 
 const ACCENT = {
@@ -35,97 +35,42 @@ export default async function Home() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-5xl px-8 py-10">
-        <header className="flex items-end justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              AI 教研自动化控制中心
-            </h1>
-            <p className="mt-1.5 text-sm text-ink-2">
-              教培 AI 教材自动化工作台 · 印前控制台
-            </p>
-          </div>
-          <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1 text-xs font-medium text-ink-2">
-            <span className="size-2 rounded-full bg-reg" />
-            系统就绪
-          </span>
-        </header>
+        <h1 className="text-2xl font-semibold tracking-tight">AI 教研自动化工作台</h1>
 
-        {/* 模块 A：流程单元库 */}
-        <section className="mt-8">
-          <h2 className="text-base font-semibold tracking-tight">流程单元库</h2>
-          <p className="mt-0.5 text-sm text-ink-3">选择一个流程开始</p>
-
-          <div className="mt-4 grid gap-4 sm:grid-cols-3">
-            {FLOW_UNITS.map((unit) => {
-              const Icon = ICONS[unit.id];
-              const chip = ACCENT[unit.accent].chip;
-              const inner = (
-                <>
-                  <div className="flex items-start gap-3">
-                    <span
-                      className={cn(
-                        "flex size-10 shrink-0 items-center justify-center rounded-md",
-                        chip,
-                      )}
-                    >
-                      <Icon className="size-5" />
-                    </span>
-                    <div className="min-w-0">
-                      <h3 className="text-[15px] font-semibold leading-tight">
-                        {unit.title}
-                      </h3>
-                      <p className="mt-1 text-xs leading-relaxed text-ink-2">
-                        {unit.desc}
-                      </p>
-                    </div>
-                  </div>
-                  {unit.href ? (
-                    <span className="mt-5 flex items-center gap-1 text-sm font-medium text-brand-deep">
-                      进入工作台
-                      <ArrowRight className="size-4" />
-                    </span>
-                  ) : (
-                    <span className="mt-5 inline-flex w-fit items-center rounded-full border border-line px-2 py-0.5 text-[11px] text-ink-3">
-                      即将接入
-                    </span>
-                  )}
-                </>
-              );
-
-              const cardCls =
-                "flex flex-col rounded-lg border border-line bg-paper p-5 shadow-sm transition-all";
-
-              return unit.href ? (
-                <Link
-                  key={unit.id}
-                  href={unit.href}
+        {/* 三项并列的生产能力；卡片本身就是入口，不再重复“进入工作台” */}
+        <section className="mt-7 grid gap-4 sm:grid-cols-3" aria-label="生产能力">
+          {FLOW_UNITS.map((unit) => {
+            const Icon = ICONS[unit.id];
+            return (
+              <Link
+                key={unit.id}
+                href={unit.href ?? "/"}
+                className="group flex items-start gap-3 rounded-lg border border-line bg-paper p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md"
+              >
+                <span
                   className={cn(
-                    cardCls,
-                    "hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md",
+                    "flex size-10 shrink-0 items-center justify-center rounded-md",
+                    ACCENT[unit.accent].chip,
                   )}
                 >
-                  {inner}
-                </Link>
-              ) : (
-                <div key={unit.id} className={cardCls}>
-                  {inner}
-                </div>
-              );
-            })}
-          </div>
+                  <Icon className="size-5" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-semibold leading-tight">{unit.title}</span>
+                  <span className="mt-1 block text-xs leading-relaxed text-ink-2">{unit.desc}</span>
+                </span>
+                <ArrowRight className="mt-1 size-4 shrink-0 text-ink-3 transition-transform group-hover:translate-x-0.5 group-hover:text-brand" />
+              </Link>
+            );
+          })}
         </section>
 
-        {/* 模块 B：通用助手（只读检索，DESIGN §193-199） */}
         <div className="mt-10">
           <AssistantPanel />
         </div>
 
-        {/* 模块 C：规则库管理（灰箱接口） */}
         <section className="mt-10">
-          <h2 className="text-base font-semibold tracking-tight">规则库管理</h2>
-          <p className="mt-0.5 text-sm text-ink-3">
-            灰箱接口 · 修改规则文件会改变 AI 的生成行为
-          </p>
+          <h2 className="text-base font-semibold tracking-tight">规则库</h2>
           <RuleLibrary initialRules={initialRules} initialError={initialError} />
         </section>
       </div>
