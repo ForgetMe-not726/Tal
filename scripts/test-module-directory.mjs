@@ -40,6 +40,9 @@ function testKnowledgeModules() {
 }
 
 function testStudentModules() {
+  // 语法标题只写英文；Let's use 只取大纲的第一个题型，避免混用题面
+  assert.match(findModuleOutline("student", "lets_talk").outline, /只写英文语法点名称/);
+  assert.match(findModuleOutline("student", "lets_use").outline, /只取大纲「考试技能」列的第一个题型/);
   // 常规课 5 个模块，加不编号的主题页
   expectModules("student", "regular", [
     "learning_objectives",

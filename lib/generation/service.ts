@@ -21,7 +21,7 @@ import { htmlTablesToMarkdown } from "@/lib/markdown/html-tables";
 import { retrieveKnowledge } from "@/lib/knowledge/retriever";
 import { buildMigrationPlan, type MigrationPlan } from "@/lib/generation/planner";
 import { buildDeterministicObjectives } from "@/lib/generation/objectives";
-import { checkVocabularyCoverage } from "@/lib/generation/coverage";
+import { checkEnglishOnly, checkVocabularyCoverage } from "@/lib/generation/coverage";
 import { resolveModuleOutlineByKey } from "@/lib/modules/service";
 import type { ModuleOutline } from "@/lib/modules/directory";
 import { sourceUnitForTargetLesson } from "@/lib/knowledge/legacy-markdown";
@@ -431,6 +431,7 @@ function buildPrompt(
 6. 首要目标是先把新版框架完整搭起来：模块、小节、表格表头、题干、序号一律齐全。能由旧版来源映射的内容照常填进去；来源确实没有的字段**保持空白**，不要写“（待人工确认）”“待补充”“暂无”这类占位文字——占位文字会被误当成正文，也会挡住后续的填充。任何时候都不要编造事实。
 7. 正文里的层级标题用二级（##）表示模块、三级（###）表示子栏目。
 8. 表格一律用 Markdown 表格语法（竖线分列 + 分隔行），**绝对不要输出 HTML 标签**（table / tr / td / br 之类）；旧版来源里若出现 HTML 表格，先按它的行列还原成 Markdown 表格再输出。
+${context.bookType === "knowledge" ? "" : "9. 学生用书和练习册正文一律英文（英式拼写）。大纲、规则或参考材料里的中文说明只作理解用，不得原样写进正文，尤其不要用中文做语法标题或目标条目。"}
 
 【目标大纲（这是目标要求，不是要输出的内容）】
 ${outlineBlock}
@@ -647,6 +648,7 @@ export async function generateModule(request: GenerationRequest, signal?: AbortS
     // 课时目标是“目标清单”，本来就不该覆盖全部核心词汇；对确定性模块做词汇覆盖检查
     // 只会每课报一次假阳性（实测一次报 14 个词全缺）。
     ...(deterministic ? [] : checkVocabularyCoverage(markdown, request.lessonProfile?.coreVocabulary)),
+    ...checkEnglishOnly(markdown, context.bookType),
   ];
   const hardIssues = hardRuleIssues(ruleSet, checks);
   if (hardIssues.length > 0) {

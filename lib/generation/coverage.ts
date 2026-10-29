@@ -92,3 +92,31 @@ export function checkVocabularyCoverage(
     },
   ];
 }
+
+/**
+ * 英文书种的正文检查：学生用书和练习册不应出现中文。
+ *
+ * 大纲、规则和参考材料里有中文说明，模型偶尔会原样搬进正文（实测语法标题
+ * 出现「并列句与逻辑连词」）。这里作为**内置提醒**返回，不阻断保存，
+ * 由老师决定是改稿还是核对来源；知识清单本来就是中文，跳过。
+ */
+export function checkEnglishOnly(
+  markdown: string,
+  bookType: string,
+): CoverageIssue[] {
+  if (bookType === "knowledge") return [];
+  const matches = markdown.match(/[㐀-鿿]+/gu) ?? [];
+  if (matches.length === 0) return [];
+  const sample = [...new Set(matches)].slice(0, 5).join("、");
+  return [
+    {
+      ruleKey: `${BUILTIN_PREFIX}english_only`,
+      versionNumber: 0,
+      code: "english_only",
+      message: `正文出现中文（${sample}）：学生用书/练习册应为英文。`,
+      expected: "英文正文",
+      actual: sample,
+      evidence: sample,
+    },
+  ];
+}

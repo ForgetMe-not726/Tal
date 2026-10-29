@@ -17,7 +17,8 @@ export type RuleCheckIssue = {
     | "section_order"
     | "source_annotation"
     | "source_confirmation"
-    | "invalid_constraint";
+    | "invalid_constraint"
+    | "english_only";
   message: string;
   expected: unknown;
   actual: unknown;

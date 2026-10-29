@@ -24,6 +24,8 @@ type ObjectivesProfile = {
   examSkills: string | null;
   /** 实际使用的一个题型；没给就退回 `examSkills`。 */
   primaryExamSkill?: string | null;
+  /** 大纲的阅读题型；考试技能列为空时作为第四条目标。 */
+  readingExamType?: string | null;
   theme?: string | null;
 };
 
@@ -124,39 +126,129 @@ const REVISION_OBJECTIVES: readonly string[] = [
 /**
  * 学生用书：主题页 `In this lesson, we will...`。
  *
- * 常规课四条（主题词汇 / 阅读文章 / 核心语法 / 考试技能训练），复习课三条——复习课不含
- * 阅读，所以省掉阅读那一条（见 `迁移对应关系-学生用书-初拟.md` §1.1）。
- * 常规课某条的大纲字段为空时**整条省略**，不留空行、不写占位。
+ * 格式照秋下成稿**固定四条**（复习课三条），句式固定：
+ * - learn words about <主题词汇>
+ * - read the article <文章标题>
+ * - learn the grammar of <语法点>
+ * - practise the use of <题型>（或旧版技能句 / 旧版 I can 的剩余技能）
  *
- * 句式照成稿（Lesson 13）：`learn words about …` / `read the article …`（文章名不加引号）/
- * `learn the grammar of …` / `practise the use of …`。
+ * 取值来源：旧版 I can 提供英文主题与技能句；大纲提供阅读标题、语法英文名和题型。
+ * 大纲里的中文说明只作参考，绝不原样写入英文正文。
  */
+function stripEnd(value: string): string {
+  return value.trim().replace(/[。.]+$/u, "").trim();
+}
+
+function withPeriod(value: string): string {
+  const text = stripEnd(value);
+  if (!text) return "";
+  return /[?!]$/u.test(text) ? text : `${text}.`;
+}
+
+const GRAMMAR_WORDS =
+  /grammar|tense|clause|conditional|verb|noun|adjective|adverb|pronoun|preposition|conjunction|passive|modal|voice|form|collocation/iu;
+
+/** 大纲的语法列常是「中文名（English name；细节）」：只取英文部分。 */
+function englishGrammar(value: string | null | undefined): string {
+  const text = cellValue(value);
+  if (!text) return "";
+  const segments = text.split(/[：:]/u).map((part) => part.trim()).filter(Boolean);
+  const before = segments[0];
+  if (before && !hasCjk(before) && /[A-Za-z]/u.test(before)) return before;
+  const after = segments
+    .slice(1)
+    .filter((part) => /[A-Za-z]/u.test(part) && !hasCjk(part))
+    .sort((a, b) => b.length - a.length)[0];
+  if (after) return after;
+  const parenthesized = [...text.matchAll(/[（(]([^（）()]*[A-Za-z][^（）()]*)[）)]/gu)]
+    .map((match) => match[1]!.trim())
+    .filter((part) => part && !hasCjk(part))
+    .sort((a, b) => b.length - a.length)[0];
+  if (parenthesized) return parenthesized.replace(/；/gu, "; ");
+  return hasCjk(text) ? "" : text;
+}
+
+/** 阅读列常写成「主题 > 文章」或「文章（中文说明）」：取主文章标题。 */
+function readingTitle(value: string | null | undefined): string {
+  const firstLine = (value ?? "")
+    .split(/\n+/u)
+    .map((line) => line.trim())
+    .filter(Boolean)[0] ?? "";
+  const withoutCount = firstLine.replace(/阅读字数统计[:：]\s*\d+/gu, "").trim();
+  // 「Goodnight and sleep tight（1.0 春 Lesson 7 原文…）」：括号里是中文说明，不是标题
+  const title = withoutCount.split(/[（(]/u)[0].split(">").pop()?.trim() ?? "";
+  return title && !hasCjk(title) ? title : "";
+}
+
+function vocabularyTopic(statements: string[], theme: string | null | undefined): string {
+  for (const statement of statements) {
+    const match = /use (?:words|vocabulary|verbs|phrases) (?:related to|about) (.+)$/iu.exec(statement);
+    if (match?.[1]) return stripEnd(match[1]);
+  }
+  const text = cellValue(theme);
+  return text && !hasCjk(text) ? stripEnd(text) : "";
+}
+
+function grammarFromStatements(statements: string[]): string {
+  const statement = statements.find((item) => GRAMMAR_WORDS.test(item));
+  if (!statement) return "";
+  const match = /^(?:use|revise|learn) (.+)$/iu.exec(statement);
+  return match?.[1] ? stripEnd(match[1]) : "";
+}
+
+function pickSkillStatement(statements: string[], used: Set<string>): string {
+  const candidates = statements.filter((item) => !used.has(item));
+  return (
+    candidates.find((item) => /^(listen|write|speak|discuss|talk)\b/iu.test(item)) ??
+    candidates.find((item) => !GRAMMAR_WORDS.test(item)) ??
+    ""
+  );
+}
+
 export function buildLessonObjectivesMarkdown(
   profile: ObjectivesProfile,
   options: { revision?: boolean; sourceText?: string | null } = {},
 ): string | null {
-  // 旧版 I can 清单是已经人工确认的能力描述，优先逐条迁移
-  const fromSource = options.revision ? [] : extractIcanStatements(options.sourceText);
-  const english = (value: string | null | undefined): string => {
-    const text = cellValue(value);
-    return text && !hasCjk(text) ? text : "";
-  };
-  const lines = options.revision
-    ? [...REVISION_OBJECTIVES]
-    : fromSource.length > 0
-      ? fromSource
-      : [
-          english(profile.theme) ? `learn words about ${english(profile.theme)}` : "",
-          english(profile.reading) ? `read the article ${english(profile.reading)}` : "",
-          english(profile.grammar) ? `learn the grammar of ${english(profile.grammar)}` : "",
-          english(profile.primaryExamSkill ?? profile.examSkills)
-            ? `practise the use of ${english(profile.primaryExamSkill ?? profile.examSkills)}`
-            : "",
-        ].filter(Boolean);
+  if (options.revision) {
+    return `## In this lesson, we will...\n\n${REVISION_OBJECTIVES.map((line) => `- ${line}`).join("\n")}`;
+  }
+
+  const statements = extractIcanStatements(options.sourceText);
+  const used = new Set<string>();
+
+  const vocab = vocabularyTopic(statements, profile.theme);
+  const vocabStatement = statements.find((item) =>
+    /use (?:words|vocabulary|verbs|phrases) (?:related to|about) /iu.test(item),
+  );
+  if (vocabStatement) used.add(vocabStatement);
+
+  const grammarStatements = statements.filter((item) => GRAMMAR_WORDS.test(item));
+  const grammar = englishGrammar(profile.grammar) || grammarFromStatements(statements);
+  const grammarStatement = grammarStatements.find((item) => item.includes(grammar));
+  if (grammarStatement) used.add(grammarStatement);
+
+  const reading = readingTitle(profile.reading);
+  const placeholder = /^(?:待定|待确认|暂无|TBD|TODO)$/iu;
+  const clean = (value: string): string => (placeholder.test(value) ? "" : value);
+  const exam = clean(stripEnd(profile.primaryExamSkill ?? profile.examSkills ?? ""));
+  const examType = clean(stripEnd(profile.readingExamType ?? ""));
+  const skill = exam
+    ? `practise the use of ${exam}`
+    : examType
+      ? `practise the use of ${examType}`
+      : stripEnd(pickSkillStatement(statements, used));
+
+  const lines = [
+    vocab ? `learn words about ${vocab}` : "",
+    reading ? `read the article ${reading}` : "",
+    grammar ? `learn the grammar of ${grammar}` : "",
+    skill,
+  ]
+    .filter(Boolean)
+    .map(withPeriod);
 
   if (lines.length === 0) return null;
-  const body = lines.map((line) => `- ${line}`).join("\n");
-  return `## In this lesson, we will...\n\n${body}`;
+  return `## In this lesson, we will...\n\n${lines.map((line) => `- ${line}`).join("\n")}`;
 }
 
 /** 按目录里的 `deterministic` 选择生成器。 */

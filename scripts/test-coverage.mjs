@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {
+  checkEnglishOnly,
   checkVocabularyCoverage,
   findMissingVocabulary,
   parseVocabularyList,
@@ -109,6 +110,22 @@ charm, densely${nbsp}populated`;
   assert.match(issues[0].message, /densely populated/);
 }
 
+/** 学生用书/练习册是英文书；知识清单是中文，不检查。 */
+function testEnglishOnly() {
+  assert.equal(checkEnglishOnly("In this lesson, we will...", "student").length, 0);
+  const issues = checkEnglishOnly(
+    ["## 并列句与逻辑连词", "- learn words about weather."].join(String.fromCharCode(10)),
+    "student",
+  );
+  assert.equal(issues.length, 1);
+  assert.match(issues[0].message, /并列句与逻辑连词/);
+  assert.equal(
+    checkEnglishOnly(["## 学习目标", "| 目标词汇 | x |"].join(String.fromCharCode(10)), "knowledge").length,
+    0,
+  );
+  assert.equal(checkEnglishOnly("中文", "workbook").length, 1);
+}
+
 const tests = [
   ["解析大纲词汇列表", testParseVocabularyList],
   ["抓出实测的漏词（回归）", testCatchesTheRealLoss],
@@ -116,6 +133,7 @@ const tests = [
   ["无大纲词汇时不报", testNoVocabularyMeansNoIssue],
   ["匹配容错", testMatchingIsForgiving],
   ["不间断空格不算漏词（回归）", testNonBreakingSpaceIsNotAMissingWord],
+  ["英文书种不出现中文", testEnglishOnly],
 ];
 
 for (const [name, test] of tests) {

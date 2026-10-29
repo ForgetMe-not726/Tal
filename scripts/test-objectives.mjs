@@ -28,29 +28,45 @@ function testKnowledgeObjectivesTable() {
   assert.equal(buildObjectivesMarkdown({ coreVocabulary: "", grammar: null, reading: "  ", examSkills: null }), null);
 }
 
-/** 学生用书常规课：优先迁移旧版 I can；没有时退回大纲，但不搬中文。 */
+/** 学生用书常规课：固定四条，旧版 I can 提供英文主题/技能，大纲提供阅读与题型。 */
 function testStudentLessonPageRegular() {
-  // 旧版 I can 清单：一行里两条也要拆开；OCR 的写法差异不做猜测性修补
   const legacy = [
     "## In this lesson, I can",
     "",
     "-- use words about markets.",
     "",
-    "-- read a magazine article for detail. - use question tags.",
+    "-- read a magazine article for detail.",
+    "",
+    "-- use the passive voice.",
+    "",
+    "-- write a short email.",
   ].join(String.fromCharCode(10));
-  const migrated = buildLessonObjectivesMarkdown(FULL_PROFILE, { sourceText: legacy });
+  const markdown = buildLessonObjectivesMarkdown(FULL_PROFILE, { sourceText: legacy });
   assert.deepEqual(
-    migrated.split(String.fromCharCode(10)).filter((line) => line.startsWith("- ")),
-    ["- use words about markets.", "- read a magazine article for detail.", "- use question tags."],
+    markdown.split(String.fromCharCode(10)).filter((line) => line.startsWith("- ")),
+    [
+      "- learn words about markets.",
+      "- read the article Beautiful villages.",
+      "- learn the grammar of the passive voice.",
+      "- practise the use of Listening Part 3.",
+    ],
   );
 
-  // 没有旧版清单时退回大纲字段；含中文的主题/语法一律跳过
+  // 没有旧版 I can、语法列也只有中文：不搬中文，只保留可用英文项
   const fallback = buildLessonObjectivesMarkdown(FULL_PROFILE);
   assert.deepEqual(
     fallback.split(String.fromCharCode(10)).filter((line) => line.startsWith("- ")),
-    ["- read the article Beautiful villages", "- practise the use of Listening Part 3"],
+    ["- read the article Beautiful villages.", "- practise the use of Listening Part 3."],
   );
   assert.doesNotMatch(fallback, /[㐀-鿿]/u, "英文目标页不能出现中文");
+
+  // 考试技能未列时，用大纲的阅读题型作为第四条
+  const withReadingType = buildLessonObjectivesMarkdown({
+    ...FULL_PROFILE,
+    examSkills: null,
+    readingExamType: "FCE Reading Part 7",
+  });
+  assert.match(withReadingType, /- practise the use of FCE Reading Part 7\./u);
 
   // 全空 → 不生成
   assert.equal(
