@@ -208,6 +208,52 @@ function recoverExploreSection(input: {
 }
 
 /**
+ * 补出标题丢失的 `Hello Vocabulary` 栏目（旧版词汇 → 新版 Let's say!）。
+ *
+ * 2.0 版把 `Hello Vocabulary` 做成一整幅图形标题，MinerU 切得出词汇故事和练习、
+ * 切不出标题，于是整段落在 `Did you know…?` 里，L3/L4 的 Let's say! 取不到来源。
+ * 判据是旧版单元的固定结构：explore 之后、下一个栏目前，出现词汇页的起点
+ * （`2a Read the text`、`Match the words…`、`Write the infinitive…`、`HOME`）。
+ * 不靠词表猜内容，只切边界。
+ */
+const VOCABULARY_START_CUES: readonly RegExp[] = [
+  /^#{0,3}\s*2a\b[^\n]*$/gimu,
+  /^#{1,3}\s*Match the words[^\n]*$/gimu,
+  /^#{0,3}\s*Write the (?:infinitive|words)[^\n]*$/gimu,
+  /^#{1,3}\s*Complete the words[^\n]*$/gimu,
+  /^#{1,3}\s*Look at the pictures[^\n]*$/gimu,
+  /^#{1,3}\s*HOME\s*$/gmu,
+];
+
+function recoverVocabularySection(input: {
+  rawText: string;
+  identified: readonly SectionRange[];
+}): SectionRange[] {
+  const { rawText, identified } = input;
+  if (identified.some((item) => item.key === "say")) return [];
+  const explore = identified.find((item) => item.key === "explore");
+  if (!explore) return [];
+
+  // 只在 explore 与下一个已识别栏目之间找词汇页起点
+  const next = identified
+    .filter((item) => item.start > explore.start)
+    .sort((a, b) => a.start - b.start)[0];
+  const limit = next?.start ?? rawText.length;
+  const windowText = rawText.slice(explore.start, limit);
+
+  let offset: number | null = null;
+  for (const pattern of VOCABULARY_START_CUES) {
+    pattern.lastIndex = 0;
+    const match = pattern.exec(windowText);
+    if (match?.index != null && (offset === null || match.index < offset)) offset = match.index;
+  }
+  if (offset == null) return [];
+  const start = explore.start + offset;
+  if (textLength(rawText.slice(start, limit)) < MIN_RECOVERED_CHARS) return [];
+  return [{ key: "say", label: "Hello Vocabulary", start, end: limit }];
+}
+
+/**
  * 2.0 版学生用书把第 1 单元的 `In this lesson, I can` 印在单元标题之前
  * （OCR 顺序是：目标页 → `# Unit 1`）。不挪进来的话，第 1 课的 I can 清单
  * 会落在前置页里解析不到，生成课时目标时又退回大纲的中文主题。
@@ -240,7 +286,10 @@ export function splitLegacyStudentBookMarkdown(
     (lessonNumber, key) => sourceOnlyUnits.includes(lessonNumber) || SOURCE_ONLY_SECTIONS.includes(key),
     "legacy-sb",
     {
-      recover: recoverExploreSection,
+      recover: (context) => [
+        ...recoverExploreSection(context),
+        ...recoverVocabularySection(context),
+      ],
       // 复习单元没有 `UNIT 7` 标题，只有 `Vocabulary Revision` 这样的栏目名。
       namedLessons: [{ heading: REVISION_UNIT_HEADING, lessonNumber: REVISION_UNIT_NUMBER }],
     },

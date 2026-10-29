@@ -558,6 +558,39 @@ function testRecoveryDoesNotGuess() {
   );
 }
 
+/** 2.0 版把 Hello Vocabulary 做成一整幅图形标题：要按结构补出 say。 */
+function testRecoversMissingVocabularyHeading() {
+  const markdown = [
+    "# UNIT 1",
+    "",
+    "# Did you know...?",
+    "",
+    "lead-in article",
+    "",
+    "2a Read the text. What do you think the surprise will be?",
+    "",
+    "vocabulary presentation text",
+    "",
+    "## 2Write the infinitive forms of the verbs in bold from 2a.",
+    "",
+    "1 say something funny",
+    "",
+    "## Hello Listening",
+    "",
+    "listening task",
+  ].join(String.fromCharCode(10));
+  const unit = splitLegacyStudentBookMarkdown(markdown)[0];
+  const say = unit.candidates.find((item) => item.sectionKey === "say");
+  assert.ok(say, "Hello Vocabulary 标题丢失时要补出 say");
+  assert.match(say.rawText, /2a Read the text/);
+  assert.doesNotMatch(say.rawText, /Hello Listening/);
+  // 已经有 say 时不能重复补
+  const withHeading = splitLegacyStudentBookMarkdown(
+    ["# UNIT 1", "# Hello Vocabulary", "", "words", "", "# Hello Reading", "", "text"].join(String.fromCharCode(10)),
+  )[0];
+  assert.equal(withHeading.candidates.filter((item) => item.sectionKey === "say").length, 1);
+}
+
 /** 2.0 版把 Unit 1 的 I can 印在单元标题之前：要挪进第 1 讲。 */
 function testLeadingObjectivesBeforeUnitHeading() {
   const markdown = [
@@ -602,6 +635,7 @@ const tests = [
   ["补 explore 时不能把 I can 清单也吞进去", testRecoveryKeepsObjectivesList],
   ["结构不符时不猜（I can 后面直接是下一个栏目）", testRecoveryDoesNotGuess],
   ["Unit 1 的目标清单在单元标题之前（2.0 版）", testLeadingObjectivesBeforeUnitHeading],
+  ["Hello Vocabulary 标题丢失时按结构补出 say（2.0 版）", testRecoversMissingVocabularyHeading],
 ];
 
 for (const [name, test] of tests) {
