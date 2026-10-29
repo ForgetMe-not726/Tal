@@ -271,7 +271,7 @@ export function splitIntoPackages(
 ): LegacyLessonPackage[] {
   const recover = options.recover;
   const lessons = collectLessonBoundaries(markdown, lessonHeading, options.namedLessons ?? []);
-  return lessons.map((lessonMatch, lessonIndex) => {
+  const packages = lessons.map((lessonMatch, lessonIndex) => {
     const sourceLessonNumber = lessonMatch.lessonNumber;
     const start = lessonMatch.index;
     const end = lessons[lessonIndex + 1]?.index ?? markdown.length;
@@ -330,6 +330,18 @@ export function splitIntoPackages(
       candidates,
     };
   });
+  // 同一讲可能出现两次标题（`# Unit 5` 与 `## UNIT 5 Revision`）。空的重复包
+  // 只会让界面显示多一个讲次、统计口径变复杂；有内容的同名包保留。
+  return packages.filter(
+    (pkg, index) =>
+      pkg.candidates.length > 0 ||
+      !packages.some(
+        (other, otherIndex) =>
+          otherIndex !== index &&
+          other.sourceLessonNumber === pkg.sourceLessonNumber &&
+          other.candidates.length > 0,
+      ),
+  );
 }
 
 export function splitLegacyKnowledgeMarkdown(
