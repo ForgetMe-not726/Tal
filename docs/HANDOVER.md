@@ -57,10 +57,10 @@
    **不提交 git**）。
 3. `npm run build`（`next build --webpack`；Turbopack 在含中文源码的 code frame 上会 panic）
 4. `node scripts/prepare-desktop.mjs`（把 `.next/static`、`public` 补进 standalone）
-5. `npx electron-builder --win nsis`（首次需配置 `ELECTRON_MIRROR` 与
+5. `npx electron-builder --win nsis`（一键安装；首次需配置 `ELECTRON_MIRROR` 与
    `ELECTRON_BUILDER_BINARIES_MIRROR`，或预先缓存 Electron/NSIS）
-6. 产物：`release/AI教材工作台-Setup-<version>.exe`；安装到
-   `%LOCALAPPDATA%\Programs\AI教材工作台`（可改），`document/` 在安装目录下。
+6. 产物：`release/AI教材工作台-Setup-<version>.exe`（one-click，per-user，无需管理员）；
+   安装到 `%LOCALAPPDATA%\Programs\AI教材工作台`，`document/` 在安装目录下。
 
 ### 运行时约定
 

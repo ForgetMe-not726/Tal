@@ -42,10 +42,9 @@ win:
   artifactName: "AI教材工作台-Setup-${version}.${ext}"
 
 nsis:
-  oneClick: false
+  oneClick: true
   perMachine: false
   allowElevation: false
-  allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
   deleteAppDataOnUninstall: false

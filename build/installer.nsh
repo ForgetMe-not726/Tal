@@ -1,8 +1,10 @@
 ; 卸载时保留安装目录下的 document 工作区（教材、OCR、版本、导出）。
-; 删除应用文件与随包资源，但不递归删除 $INSTDIR，避免把老师的数据一起删掉。
+; 只删除应用文件与随包资源，不递归删除 $INSTDIR，避免把老师的数据一起删掉。
 !macro customUnInstall
-  IfFileExists "$INSTDIR\document\*.*" 0 +3
+  IfFileExists "$INSTDIR\document\*.*" 0 done
+  IfSilent done
   MessageBox MB_OK|MB_ICONINFORMATION "工作区 document 会保留在安装目录，不会被卸载程序删除。"
+  done:
 !macroend
 
 !macro customRemoveFiles
