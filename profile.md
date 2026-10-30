@@ -377,7 +377,9 @@ OCR Sidecar（默认 MinerU，见 §5.2）
 可选公司 AI Gateway
 ~~~
 
-建议采用 Tauri v2 或同等桌面壳，前端静态打包并经本地命令桥访问文件和 sidecar。业务逻辑通过本地命令调用，不再保留 Next.js REST API 作为产品边界。
+首版交付采用 **Electron**（“同等桌面壳”）：Electron 自带 Node/Chromium，托管 Next standalone 服务和随包 OCR sidecar；窗口只访问本机 loopback。Tauri v2 仍是后续可替换形态，业务层不依赖壳。
+
+业务逻辑通过本地服务调用；Next.js REST API 只在安装包内部作为本机服务边界，不对外暴露。
 
 当前 Next.js + Supabase 原型不是后续运行时架构；它仍可作为 UI、文档编辑、规则解析、检索和 DOCX 逻辑的迁移来源。
 

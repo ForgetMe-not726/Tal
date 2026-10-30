@@ -1,0 +1,11 @@
+{
+  "provider": "anthropic-compatible",
+  "baseUrl": "https://gateway.example.com",
+  "authMode": "",
+  "temperature": null,
+  "models": {
+    "generation": "",
+    "review": "",
+    "vision": ""
+  }
+}

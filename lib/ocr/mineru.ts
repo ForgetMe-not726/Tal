@@ -40,26 +40,52 @@ export function mineruHome(): string {
   return override ? override : join(homedir(), ".venvs", "mineru");
 }
 
-/** 可执行文件（Windows 是 `Scripts/mineru.exe`，类 Unix 是 `bin/mineru`）。 */
-export function mineruExecutable(home = mineruHome()): string {
-  return process.platform === "win32" ? join(home, "Scripts", "mineru.exe") : join(home, "bin", "mineru");
+/**
+ * venv 的解释器，页图渲染要用它（pypdfium2 装在这里面）。
+ *
+ * 兼容三种落点：
+ * - 开发机：`<home>/Scripts/python.exe`
+ * - 随包：`<home>/venv/Scripts/python.exe`（便携 Python + venv）
+ * - 便携根：`<home>/python.exe`（依赖直接装在 python 根）
+ */
+export function mineruPython(home = mineruHome()): string {
+  if (process.platform === "win32") {
+    for (const candidate of [join(home, "venv", "Scripts", "python.exe"), join(home, "python.exe"), join(home, "Scripts", "python.exe")]) {
+      if (existsSync(candidate)) return candidate;
+    }
+    return join(home, "Scripts", "python.exe");
+  }
+  for (const candidate of [join(home, "venv", "bin", "python"), join(home, "bin", "python")]) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return join(home, "bin", "python");
 }
 
-/** venv 的解释器，页图渲染要用它（pypdfium2 装在这里面）。 */
-export function mineruPython(home = mineruHome()): string {
-  return process.platform === "win32"
-    ? join(home, "Scripts", "python.exe")
-    : join(home, "bin", "python");
+/** 引擎 CLI：优先用装好的 `mineru` 入口；随包布局用 `python -m mineru.cli.client`。 */
+export function mineruCli(home = mineruHome()): { command: string; prefix: string[] } {
+  const legacy = process.platform === "win32" ? join(home, "Scripts", "mineru.exe") : join(home, "bin", "mineru");
+  if (existsSync(legacy)) return { command: legacy, prefix: [] };
+  const python = mineruPython(home);
+  if (existsSync(python)) return { command: python, prefix: ["-m", "mineru.cli.client"] };
+  return { command: legacy, prefix: [] };
+}
+
+/** 兼容旧调用：返回 CLI 的可执行文件路径。 */
+export function mineruExecutable(home = mineruHome()): string {
+  return mineruCli(home).command;
 }
 
 /**
  * 引擎配置。CLI 用 `~/.mineru.json` 找模型目录；以别的账户身份跑时找不到会**重新下载模型**，
  * 所以显式指过去——存在才设，不覆盖用户自己的配置。
+ *
+ * 随包布局把配置放在 `<home>/mineru.json`；开发机回退到 `~/mineru.json`。
  */
 export function mineruEnv(): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = { ...process.env };
-  const config = join(homedir(), "mineru.json");
-  if (!env.MINERU_TOOLS_CONFIG_JSON && existsSync(config)) {
+  const candidates = [join(mineruHome(), "mineru.json"), join(homedir(), "mineru.json")];
+  const config = candidates.find((path) => existsSync(path));
+  if (!env.MINERU_TOOLS_CONFIG_JSON && config) {
     env.MINERU_TOOLS_CONFIG_JSON = config;
   }
   return env;
@@ -67,27 +93,42 @@ export function mineruEnv(): NodeJS.ProcessEnv {
 
 /** 引擎是否就绪；不ready 时返回可读原因，而不是等到 spawn 才崩。 */
 export async function checkMineru(home = mineruHome()): Promise<{ ready: boolean; reason?: string }> {
-  const exe = mineruExecutable(home);
+  const cli = mineruCli(home);
   try {
-    await access(exe);
+    await access(cli.command);
   } catch {
     return {
       ready: false,
-      reason: `找不到 OCR 引擎：${exe}。请确认已安装 MinerU，或用环境变量 MINERU_HOME 指定安装目录。`,
+      reason: `找不到 OCR 引擎：${cli.command}。请确认已安装 MinerU，或用环境变量 MINERU_HOME 指定安装目录。`,
     };
+  }
+  // 随包布局的 CLI 是 python -m，必须确认模块真的在随包 site-packages 里
+  if (cli.prefix.length > 0) {
+    const moduleCandidates = [
+      join(home, "venv", "Lib", "site-packages", "mineru", "cli", "client.py"),
+      join(home, "Lib", "site-packages", "mineru", "cli", "client.py"),
+    ];
+    if (!moduleCandidates.some((path) => existsSync(path))) {
+      return { ready: false, reason: `OCR 引擎缺少 MinerU 模块：${moduleCandidates[0]}` };
+    }
   }
   return { ready: true };
 }
 
 /** 引擎命令（纯函数，便于单测）。 */
 export function mineruCommand(input: {
-  executable: string;
+  /** 直接指定可执行文件（测试/旧调用）；不给就用 MINERU_HOME 解析。 */
+  executable?: string;
+  home?: string;
   pdfPath: string;
   outDir: string;
   options?: MineruRunOptions;
 }): string[] {
   const options = { ...DEFAULT_MINERU_OPTIONS, ...input.options };
-  const args = [input.executable, "-p", input.pdfPath, "-o", input.outDir];
+  const cli = input.executable
+    ? { command: input.executable, prefix: [] as string[] }
+    : mineruCli(input.home);
+  const args = [cli.command, ...cli.prefix, "-p", input.pdfPath, "-o", input.outDir];
   args.push("-b", options.backend, "-m", options.method, "-l", options.language);
   if (typeof input.options?.startPage === "number") args.push("-s", String(input.options.startPage));
   if (typeof input.options?.endPage === "number") args.push("-e", String(input.options.endPage));
@@ -256,8 +297,7 @@ export function spawnMineru(input: {
   expectedPages?: number | null;
   onProgress?: (progress: MineruProgress) => void;
 }): MineruHandle {
-  const executable = mineruExecutable();
-  const [command, ...args] = mineruCommand({ executable, ...input });
+  const [command, ...args] = mineruCommand(input);
   const child: ChildProcess = spawn(command, args, {
     env: mineruEnv(),
     windowsHide: true,

@@ -44,6 +44,44 @@
 
 浏览器访问只作为本机应用的 loopback 调试/兼容方式，不作为交付方式；AI Gateway 仍按任务发送必要上下文。
 
+## 桌面安装包构建（2026-10-30 首版）
+
+首版桌面壳采用 **Electron**（profile §8 的“同等桌面壳”），Next.js 以 standalone 形式随包，
+由 Electron 在本机随机 loopback 端口启动；老师不需要 Node/Python/端口。
+
+### 构建步骤（Windows x64）
+
+1. `npm ci`
+2. `powershell -ExecutionPolicy Bypass -File scripts/build-ocr-runtime.ps1`
+   生成 `build/ocr`（便携 Python + MinerU venv + PDF-Extract-Kit pipeline 模型，约 2.5 GB，
+   **不提交 git**）。
+3. `npm run build`（`next build --webpack`；Turbopack 在含中文源码的 code frame 上会 panic）
+4. `node scripts/prepare-desktop.mjs`（把 `.next/static`、`public` 补进 standalone）
+5. `npx electron-builder --win nsis`（首次需配置 `ELECTRON_MIRROR` 与
+   `ELECTRON_BUILDER_BINARIES_MIRROR`，或预先缓存 Electron/NSIS）
+6. 产物：`release/AI教材工作台-Setup-<version>.exe`；安装到
+   `%LOCALAPPDATA%\Programs\AI教材工作台`（可改），`document/` 在安装目录下。
+
+### 运行时约定
+
+- `AI_TEACHING_INSTALL_DIR` 由 Electron 设为安装目录；`document/`、`resources/` 都以它为基准。
+- `MINERU_HOME=<安装目录>/resources/ocr`；`MINERU_TOOLS_CONFIG_JSON` 指向
+  `document/.app/ocr/mineru.json`，模型路径在首次启动时写死为随包路径。
+- 便携 venv 的 `pyvenv.cfg` 在首次启动时改写成实际安装路径。
+- 卸载脚本保留 `document/`；只删除应用与随包资源。
+
+### AI Gateway 凭据
+
+- 非敏感配置放 `resources/config/ai.json`（provider/baseUrl/模型名）；
+- API Key 用 Electron `safeStorage`（Windows DPAPI）加密保存在用户目录，启动时解密注入子进程；
+- 未配置时识别/编辑/导出不受影响，生成/审校明确提示。
+
+### 尚未完成
+
+- 代码签名证书、自动更新源、公司 AI Gateway 发布配置；
+- 安装包在干净 Windows VM 上完成 HANDOVER §2 全流程验收；
+- 安装包体积/安装时长与公司分发渠道确认。
+
 ## 3. 工作区备份与恢复
 
 - 工作区是教材、规则、OCR 结果、版本和导出物的唯一事实源；

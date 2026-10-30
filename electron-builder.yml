@@ -1,0 +1,53 @@
+appId: com.xueersi.ai-textbook
+productName: AI教材工作台
+copyright: Copyright © 2026
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - electron/**/*
+  - package.json
+  # 服务端依赖在 extraResources/app 里自带；asar 只放壳，避免把 Next/React 再打一遍
+  - "!node_modules/**/*"
+
+extraResources:
+  # Next standalone：server.js + 最小 node_modules
+  - from: .next/standalone
+    to: app
+  # 随包规则/知识库基线；排除开发机上可能存在的 OCR 缓存
+  - from: resources
+    to: .
+    filter:
+      - "**/*"
+      - "!ocr/**"
+  # 便携 Python + MinerU + pipeline 模型（由 scripts/build-ocr-runtime.ps1 生成）
+  - from: build/ocr
+    to: ocr
+    filter:
+      - "**/*"
+
+asar: true
+npmRebuild: false
+compression: normal
+afterPack: build/after-pack.cjs
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  icon: build/icon.png
+  artifactName: "AI教材工作台-Setup-${version}.${ext}"
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  deleteAppDataOnUninstall: false
+  include: build/installer.nsh
+  artifactName: "AI教材工作台-Setup-${version}.${ext}"

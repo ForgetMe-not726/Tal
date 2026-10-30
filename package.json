@@ -1,10 +1,10 @@
 {
-  "name": "cr",
+  "name": "ai-textbook-workbench",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "test:rules": "node --experimental-strip-types scripts/test-rule-engine.mjs",
@@ -35,7 +35,11 @@
     "test:assistant": "node --experimental-strip-types scripts/test-assistant.mjs",
     "test:collections": "node --experimental-strip-types scripts/test-knowledge-collections.mjs",
     "test:curriculum": "node --experimental-strip-types scripts/test-curriculum.mjs",
-    "test:migration": "node --experimental-strip-types scripts/test-workspace-migration.mjs"
+    "test:migration": "node --experimental-strip-types scripts/test-workspace-migration.mjs",
+    "desktop:prepare": "node scripts/prepare-desktop.mjs",
+    "desktop:dev": "electron .",
+    "desktop:standalone": "cross-env DESKTOP_USE_STANDALONE=1 electron .",
+    "dist:win": "npm run build && npm run desktop:prepare && electron-builder --win nsis"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.23",
@@ -62,10 +66,17 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/turndown": "^5.0.6",
+    "cross-env": "^10.1.0",
+    "electron": "^45.1.0",
+    "electron-builder": "^26.18.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
     "playwright-core": "^1.62.1",
     "tailwindcss": "^4",
     "typescript": "^5"
-  }
+  },
+  "main": "electron/main.cjs",
+  "description": "AI 教材智能迁移与审校工具（本地版）",
+  "author": "AI 教材工作台",
+  "productName": "AI教材工作台"
 }

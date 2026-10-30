@@ -18,7 +18,10 @@
 /out/
 
 # production
-/build
+/build/*
+!/build/icon.png
+!/build/installer.nsh
+!/build/after-pack.cjs
 
 # misc
 .DS_Store
@@ -47,3 +50,7 @@ next-env.d.ts
 
 # 本地工作区（安装目录下的 document，运行时生成，不提交）
 /document/
+
+# 桌面安装包产物
+/release/
+/build/ocr/
