@@ -55,11 +55,12 @@
 2. `powershell -ExecutionPolicy Bypass -File scripts/build-ocr-runtime.ps1`
    生成 `build/ocr`（便携 Python + MinerU venv + PDF-Extract-Kit pipeline 模型，约 2.5 GB，
    **不提交 git**）。
-3. `npm run build`（`next build --webpack`；Turbopack 在含中文源码的 code frame 上会 panic）
-4. `node scripts/prepare-desktop.mjs`（把 `.next/static`、`public` 补进 standalone）
-5. `npx electron-builder --win nsis`（一键安装；首次需配置 `ELECTRON_MIRROR` 与
+3. `node scripts/configure-ai.mjs --build-only`（从 `.env.local` 生成 `resources/config/ai.json`，含内部 Key；文件不提交 git）
+4. `npm run build`（`next build --webpack`；Turbopack 在含中文源码的 code frame 上会 panic）
+5. `node scripts/prepare-desktop.mjs`（把 `.next/static`、`public` 补进 standalone）
+6. `npx electron-builder --win nsis`（一键安装；首次需配置 `ELECTRON_MIRROR` 与
    `ELECTRON_BUILDER_BINARIES_MIRROR`，或预先缓存 Electron/NSIS）
-6. 产物：`release/AI教材工作台-Setup-<version>.exe`（one-click，per-user，无需管理员）；
+7. 产物：`release/AI教材工作台-Setup-<version>.exe`（one-click，per-user，无需管理员）；
    安装到 `%LOCALAPPDATA%\Programs\AI教材工作台`，`document/` 在安装目录下。
 
 ### 运行时约定
@@ -70,16 +71,20 @@
 - 便携 venv 的 `pyvenv.cfg` 在首次启动时改写成实际安装路径。
 - 卸载脚本保留 `document/`；只删除应用与随包资源。
 
-### AI Gateway 凭据
+### AI Gateway 凭据（内部工具口径）
 
-- 非敏感配置放 `resources/config/ai.json`（provider/baseUrl/模型名）；
-- API Key 用 Electron `safeStorage`（Windows DPAPI）加密保存在用户目录，启动时解密注入子进程；
+- `node scripts/configure-ai.mjs` 从本地 `.env.local` 生成 `resources/config/ai.json`
+  （provider/baseUrl/models/apiKey），随安装包分发；该文件含 Key，**不提交 git**。
+- 本机已安装的桌面版同时用 Electron `safeStorage`（Windows DPAPI）写一份加密 Key，
+  启动时优先使用，便于不改安装包即可换 Key。
+- 需求方 2026-10-30 确认：公司内部工具，使用本地 Key，不额外做凭据分发流程。
 - 未配置时识别/编辑/导出不受影响，生成/审校明确提示。
 
 ### 尚未完成
 
-- 代码签名证书、自动更新源、公司 AI Gateway 发布配置；
+- 代码签名证书、自动更新源；
 - 安装包在干净 Windows VM 上完成 HANDOVER §2 全流程验收；
+- 卸载/升级保留 `document` 的实机回归；
 - 安装包体积/安装时长与公司分发渠道确认。
 
 ## 3. 工作区备份与恢复

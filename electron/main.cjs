@@ -95,6 +95,8 @@ function aiEnv() {
   ]) {
     if (config.models?.[task]) env[key] = config.models[task];
   }
+  // 内部发布包可以把 Key 放在 resources/config/ai.json；本机 DPAPI 文件优先。
+  if (config.apiKey) env.AI_API_KEY = config.apiKey;
   const key = readAiKey();
   if (key) env.AI_API_KEY = key;
   return env;
