@@ -18,7 +18,7 @@ const NAV = [
   { href: "/recognize", label: "资料识别", icon: ScanText, ready: true },
   { href: "/workbench", label: "教材制作", icon: NotebookPen, ready: true },
   { href: "/review", label: "教材审校", icon: ShieldCheck, ready: true },
-  { href: "/library", label: "本地资料库", icon: BookMarked, ready: false },
+  { href: "/library", label: "本地资料库", icon: BookMarked, ready: true },
   { href: "/settings", label: "设置", icon: FolderCog, ready: false },
 ];
 

@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 import type { ExportFormat, GeneratedBlock, ModuleDef, ModuleVersionSummary, PlateTone } from "@/lib/types";
 
 const EXPORT_FORMATS: Array<{ id: ExportFormat; label: string }> = [
-  { id: "markdown", label: "Markdown" },
   { id: "docx", label: "Word (.docx)" },
+  { id: "markdown", label: "Markdown" },
 ];
 
 interface Props {
@@ -55,7 +55,7 @@ export function WorkbenchCenter({
   const loadingLabel = modules.find((m) => m.id === loadingModule)?.label ?? "";
   const loadingIndex = modules.findIndex((m) => m.id === loadingModule);
   const loadingTone: PlateTone = loadingIndex >= 0 ? plateTone(loadingIndex) : "brand";
-  const [exportFormat, setExportFormat] = React.useState<ExportFormat>("markdown");
+  const [exportFormat, setExportFormat] = React.useState<ExportFormat>("docx");
   // 编号顺序来自模块目录（modules 已按课型过滤、按 sortOrder 排好），不在这里写死。
   const numberedKeys = modules.filter((item) => item.numbered).map((item) => item.moduleKey ?? item.id);
 
