@@ -60,8 +60,13 @@
 5. `node scripts/prepare-desktop.mjs`（把 `.next/static`、`public` 补进 standalone）
 6. `npx electron-builder --win nsis`（一键安装；首次需配置 `ELECTRON_MIRROR` 与
    `ELECTRON_BUILDER_BINARIES_MIRROR`，或预先缓存 Electron/NSIS）
-7. 产物：`release/AI教材工作台-Setup-<version>.exe`（one-click，per-user，无需管理员）；
-   安装到 `%LOCALAPPDATA%\Programs\AI教材工作台`，`document/` 在安装目录下。
+7. `npm run verify:release`：校验安装包 SHA512/size、Next 产物、node_modules、随包 OCR 模型、
+   规则/知识库基线、AI 发布配置和版本号，并把 SHA256 写入 `release/SHA256SUMS.txt`。
+8. 产物：`release/AI教材工作台-Setup-<version>.exe`（one-click，per-user，无需管理员）；
+   安装到 `%LOCALAPPDATA%\Programs\ai-textbook-workbench`（electron-builder 对非 ASCII
+   productName 使用 ASCII 目录名；桌面/开始菜单快捷方式显示“AI教材工作台”），
+   `document/` 在安装目录下。0.1.0 实测安装包约 1.4 GB，安装后约 2.9 GB
+   （其中 OCR 运行时与模型约 2.5 GB），本机静默安装约 6–8 分钟。
 
 ### 运行时约定
 
@@ -69,7 +74,18 @@
 - `MINERU_HOME=<安装目录>/resources/ocr`；`MINERU_TOOLS_CONFIG_JSON` 指向
   `document/.app/ocr/mineru.json`，模型路径在首次启动时写死为随包路径。
 - 便携 venv 的 `pyvenv.cfg` 在首次启动时改写成实际安装路径。
-- 卸载脚本保留 `document/`；只删除应用与随包资源。
+
+### 卸载与升级（2026-11-02 实机回归）
+
+- 卸载入口：Windows“应用和功能”中的“AI教材工作台 0.1.0”，或安装目录下的
+  `Uninstall AI教材工作台.exe`；一键安装模式支持 `/S` 静默卸载。
+- `build/installer.nsh` 的 `customRemoveFiles` 只删除程序、`resources/`、`locales/`
+  和快捷方式/注册表项；**不删除 `document/`**。
+- 实机验证：安装当前版本 → 在 `document/` 写入 sentinel → 覆盖安装新包 → sentinel 与
+  AI 配置保留 → 静默卸载 → 程序文件和注册表项移除，`document/` 与 sentinel 保留。
+- 升级直接再次运行新安装包，覆盖程序与随包资源；`document/` 和
+  `%APPDATA%\AI教材工作台\ai-key.bin` 不被覆盖。
+- 若需彻底清理，由老师手动删除安装目录下剩余的 `document/`。
 
 ### AI Gateway 凭据（内部工具口径）
 
@@ -79,12 +95,33 @@
   启动时优先使用，便于不改安装包即可换 Key。
 - 需求方 2026-10-30 确认：公司内部工具，使用本地 Key，不额外做凭据分发流程。
 - 未配置时识别/编辑/导出不受影响，生成/审校明确提示。
+- Key 轮换：更新 `.env.local` 后运行 `npm run configure:ai` 可同时更新本机安装版的
+  `resources/config/ai.json` 和 DPAPI 文件；给老师的安装包需要重新执行
+  `npm run dist:win`（Key 随包）。不要提交 `resources/config/ai.json`，也不要把它复制进
+  `document/`。
+
+### 代码签名与分发
+
+- 当前未购买/未配置代码签名证书，安装包未签名，Windows SmartScreen 可能提示
+  “未知发布者”。内部分发时需告知老师核对 `SHA256SUMS.txt` 后再运行。
+- 证书就绪后设置 `CSC_LINK`（.pfx 路径或 base64）和 `CSC_KEY_PASSWORD`，
+  重新执行 `npm run dist:win`；electron-builder 会自动签名安装包和主程序。
+- `latest.yml` 与 `.blockmap` 会随构建生成，但当前**没有配置更新服务器**，应用也不会
+  自动检查更新；新版本按安装包手动覆盖安装。
+
+### 交付前检查清单
+
+1. `npm test`、`npm run lint`、`npx tsc --noEmit` 通过；
+2. `npm run dist:win` 生成含内部 AI 配置的安装包；
+3. `npm run verify:release` 通过并生成 `release/SHA256SUMS.txt`；
+4. 在一台未装 Node/Python 的 Windows x64 机器上按第 2 节走完 10 步；
+5. 记录安装包 SHA256、版本号和已知问题，再交付。
 
 ### 尚未完成
 
-- 代码签名证书、自动更新源；
-- 安装包在干净 Windows VM 上完成 HANDOVER §2 全流程验收；
-- 卸载/升级保留 `document` 的实机回归；
+- 代码签名证书；
+- 安装包在干净 Windows VM 上完成 HANDOVER §2 全流程验收（当前验证机已装开发环境）；
+- 自动更新源；
 - 安装包体积/安装时长与公司分发渠道确认。
 
 ## 3. 工作区备份与恢复

@@ -10,6 +10,12 @@
 !macro customRemoveFiles
   RMDir /r "$INSTDIR\resources"
   RMDir /r "$INSTDIR\locales"
+  ; RMDir /r 偶尔会留下刚被释放的空目录，自底向上再收一次
+  RMDir "$INSTDIR\resources\ocr\venv\Lib\site-packages"
+  RMDir "$INSTDIR\resources\ocr\venv\Lib"
+  RMDir "$INSTDIR\resources\ocr\venv"
+  RMDir "$INSTDIR\resources\ocr"
+  RMDir "$INSTDIR\resources"
   Delete "$INSTDIR\*.*"
   ; document 还在时 RMDir 会失败，这是有意的：数据保留
   RMDir "$INSTDIR"

@@ -39,7 +39,8 @@
     "desktop:prepare": "node scripts/prepare-desktop.mjs",
     "desktop:dev": "electron .",
     "desktop:standalone": "cross-env DESKTOP_USE_STANDALONE=1 electron .",
-    "dist:win": "node scripts/configure-ai.mjs --build-only && npm run build && npm run desktop:prepare && electron-builder --win nsis",
+    "dist:win": "node scripts/configure-ai.mjs --build-only && npm run build && npm run desktop:prepare && electron-builder --win nsis && npm run verify:release",
+    "verify:release": "node scripts/verify-release.mjs",
     "configure:ai": "node scripts/configure-ai.mjs"
   },
   "dependencies": {
