@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { searchCorpora } from "../lib/assistant/match.ts";
 import { extractKeywords, validatePlan } from "../lib/assistant/plan.ts";
 import { SOURCE_KIND_LABEL } from "../lib/assistant/types.ts";
+import { htmlToText, normalizeBox, parseContentPages } from "../lib/assistant/text.ts";
 
 /**
  * 通用助手的检索契约（`docs/AI-ASSISTANT-RETRIEVAL.md` §4）。
@@ -134,6 +135,89 @@ function testShortKeywordsIgnored() {
   assert.deepEqual(result.hits, []);
 }
 
+
+/** 已确认 OCR 教材：页 + 块坐标 + 原页地址都要进契约。 */
+function testOcrCorpusEvidence() {
+  const doc = {
+    jobId: "job-1",
+    dirName: "winter-sb-ocr",
+    projectId: "p1",
+    bookType: "student",
+    documentName: "寒假学生用书.pdf",
+    pageCount: 2,
+    pages: new Map([[11, "核心词汇 environment 环境"]]),
+    blocks: [
+      { id: "b00099", type: "text", pageIndex: 11, order: 99, box: { left: 0.1, top: 0.2, width: 0.3, height: 0.04 }, text: "核心词汇 environment 环境" },
+    ],
+  };
+  const result = searchCorpora(corpora({ ocrDocs: [doc] }), { query: "environment", scope: "workspace", limit: 20 });
+  const hit = result.hits.find((item) => item.sourceRef.startsWith("ocr:job-1"));
+  assert.ok(hit, "OCR 正文必须能命中");
+  assert.equal(hit.kind, "source");
+  assert.equal(hit.pageIndex, 11);
+  assert.equal(hit.blockId, "b00099");
+  assert.deepEqual(hit.box, { left: 0.1, top: 0.2, width: 0.3, height: 0.04 });
+  assert.equal(hit.ocrJobId, "job-1");
+  assert.equal(hit.pageImageUrl, "/api/ocr/library/winter-sb-ocr/pages/p0011.jpg");
+  assert.equal(result.searched.ocrSources, 1);
+
+  // 表格块 text 为空、正文在 html 里：仍要按块定位。
+  const tableDoc = { ...doc, pages: new Map([[3, "environment 环境"]]), blocks: [
+    { id: "b00003", type: "table", pageIndex: 3, order: 3, box: { left: 0.2, top: 0.3, width: 0.5, height: 0.2 }, text: "", html: "<table><tr><td>environment</td></tr></table>" },
+  ] };
+  const tableHit = searchCorpora(corpora({ ocrDocs: [tableDoc] }), { query: "environment", scope: "workspace" }).hits.find((item) => item.sourceRef.startsWith("ocr:job-1"));
+  assert.ok(tableHit, "表格 html 里的词也要命中");
+  assert.equal(tableHit.blockId, "b00003");
+  assert.equal(tableHit.box.left, 0.2);
+
+  // 没有结构块时诚实降级为“只定位到页”。
+  const pageOnly = searchCorpora(corpora({ ocrDocs: [{ ...doc, blocks: [] }] }), { query: "environment", scope: "workspace" }).hits.find((item) => item.sourceRef.startsWith("ocr:job-1"));
+  assert.ok(pageOnly);
+  assert.equal(pageOnly.blockId, null);
+  assert.equal(pageOnly.box, null);
+  assert.equal(pageOnly.pageIndex, 11);
+
+  // 书种过滤生效；Lesson/模块过滤不套 OCR（manifest 没有这些字段）。
+  assert.equal(searchCorpora(corpora({ ocrDocs: [doc] }), { query: "environment", scope: "workspace", bookType: "workbook", limit: 20 }).hits.some((item) => item.sourceRef.startsWith("ocr:")), false);
+  assert.equal(searchCorpora(corpora({ ocrDocs: [doc] }), { query: "environment", scope: "workspace", moduleKey: "lets_read", limit: 20 }).hits.some((item) => item.sourceRef.startsWith("ocr:")), true);
+}
+
+/** 老师导入的 PDF/Markdown：reference 命中 + 可选页图。 */
+function testLibraryCorpusEvidence() {
+  const libraryDocs = [
+    { itemId: "item-1", documentId: "doc-1", documentName: "Cambridge reader.pdf", pageIndex: 4, text: "environment 环境 主题阅读", sourceRef: "library:item-1/doc-1/p4", pageImageUrl: "/api/library/items/item-1/pages/doc-1/p0004.jpg" },
+    { itemId: "item-2", documentId: "doc-2", documentName: "备课笔记.md", pageIndex: null, text: "environment 主题备课笔记", sourceRef: "library:item-2/doc-2" },
+  ];
+  const result = searchCorpora(corpora({ libraryDocs }), { query: "environment", scope: "workspace", limit: 20 });
+  const pdf = result.hits.find((item) => item.sourceRef === "library:item-1/doc-1/p4");
+  assert.ok(pdf, "资料库 PDF 要命中");
+  assert.equal(pdf.kind, "reference");
+  assert.equal(pdf.pageIndex, 4);
+  assert.equal(pdf.pageImageUrl, "/api/library/items/item-1/pages/doc-1/p0004.jpg");
+  const md = result.hits.find((item) => item.sourceRef === "library:item-2/doc-2");
+  assert.ok(md, "资料库 Markdown 要命中");
+  assert.equal(md.pageIndex, null);
+  assert.equal(md.pageImageUrl, undefined);
+  assert.equal(result.searched.libraryDocs, 2);
+}
+
+function testTextHelpers() {
+  assert.equal(htmlToText("<table><tr><td>environment</td><td>环境</td></tr></table>"), "environment 环境");
+  assert.equal(htmlToText("<p>A &amp; B</p>"), "A & B");
+  const pages = parseContentPages([
+    "<!-- page 3 -->",
+    "# Unit 9",
+    "<table><tr><td>environment</td></tr></table>",
+    "<!-- page 4 -->",
+    "next",
+  ].join(String.fromCharCode(10)));
+  assert.equal(pages.get(3).includes("environment"), true);
+  assert.equal(pages.get(3).includes("# Unit"), false, "标题前缀要去掉");
+  assert.equal(pages.get(4).includes("next"), true);
+  assert.deepEqual(normalizeBox({ left: 0.1, top: 0.2, width: 0.3, height: 0.4 }), { left: 0.1, top: 0.2, width: 0.3, height: 0.4 });
+  assert.equal(normalizeBox({ left: 0.1, top: 0.2, width: 0, height: 0.4 }), null);
+}
+
 // ---------------------------------------------------------------------------
 // 查询计划
 // ---------------------------------------------------------------------------
@@ -187,6 +271,9 @@ const tests = [
   ["单字不参与检索", testShortKeywordsIgnored],
   ["查询计划：认不出的条件丢掉并报告", testPlanValidation],
   ["AI 不可用时退回关键词直检", testKeywordFallback],
+  ["OCR 教材命中带页码、块坐标与原页地址", testOcrCorpusEvidence],
+  ["本地资料命中带页图/无页图两种形态", testLibraryCorpusEvidence],
+  ["HTML/页码/坐标工具", testTextHelpers],
 ];
 
 for (const [name, test] of tests) {

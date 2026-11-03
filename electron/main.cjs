@@ -305,6 +305,32 @@ async function bootstrap() {
   ipcMain.handle("desktop:open-logs", () => shell.openPath(logDir));
   ipcMain.handle("desktop:open-workspace", () => shell.openPath(documentDir));
 
+  const localSender = (event) => {
+    try {
+      const source = new URL(event.senderFrame?.url ?? "");
+      return source.hostname === "127.0.0.1" || source.hostname === "localhost";
+    } catch {
+      return false;
+    }
+  };
+  ipcMain.handle("desktop:pick-library-files", async (event) => {
+    if (!localSender(event)) return [];
+    const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+      title: "选择 PDF 或 Markdown 资料",
+      properties: ["openFile", "multiSelections"],
+      filters: [{ name: "PDF / Markdown", extensions: ["pdf", "md", "markdown"] }],
+    });
+    return result.canceled ? [] : result.filePaths;
+  });
+  ipcMain.handle("desktop:pick-library-folder", async (event) => {
+    if (!localSender(event)) return [];
+    const result = await dialog.showOpenDialog(mainWindow ?? undefined, {
+      title: "选择资料文件夹（PDF / Markdown）",
+      properties: ["openDirectory"],
+    });
+    return result.canceled ? [] : result.filePaths;
+  });
+
   try {
     const { url } = await startServer();
     createWindow(url);

@@ -4,4 +4,6 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("desktop", {
   openLogs: () => ipcRenderer.invoke("desktop:open-logs"),
   openWorkspace: () => ipcRenderer.invoke("desktop:open-workspace"),
+  pickLibraryFiles: () => ipcRenderer.invoke("desktop:pick-library-files"),
+  pickLibraryFolder: () => ipcRenderer.invoke("desktop:pick-library-folder"),
 });

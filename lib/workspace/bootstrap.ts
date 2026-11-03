@@ -22,7 +22,10 @@ import {
   WORKSPACE_FILE,
   WORKSPACE_SCHEMA_VERSION,
   appDir,
+  collectionsRecycleDir,
   knowledgeDir,
+  libraryDir,
+  libraryRecycleDir,
   moduleDefinitionsPath,
   rebuildableDirs,
   rulesDir,
@@ -88,7 +91,16 @@ export async function ensureWorkspace(): Promise<string> {
         `或设置 AI_TEACHING_INSTALL_DIR 指向可写位置。`,
     );
   }
-  for (const dir of [rulesDir(), knowledgeDir(), join(root, PROJECTS_DIR), join(root, EXPORTS_DIR), appDir()]) {
+  for (const dir of [
+    rulesDir(),
+    knowledgeDir(),
+    libraryDir(),
+    libraryRecycleDir(),
+    collectionsRecycleDir(),
+    join(root, PROJECTS_DIR),
+    join(root, EXPORTS_DIR),
+    appDir(),
+  ]) {
     await mkdir(dir, { recursive: true });
   }
   for (const dir of rebuildableDirs()) {
@@ -98,6 +110,7 @@ export async function ensureWorkspace(): Promise<string> {
   // 基线：只在工作区里还没有时才装。
   await seedFromResources(join(resourcesDir(), RULES_DIR), rulesDir());
   await seedFromResources(join(resourcesDir(), KNOWLEDGE_DIR), knowledgeDir());
+  await seedKnowledgeCollections();
 
   // 模块目录：只在工作区里还没有时写入出厂默认；之后以这份文件为准（老师可改）。
   if (!(await exists(moduleDefinitionsPath()))) {
@@ -145,4 +158,23 @@ export async function ensureWorkspace(): Promise<string> {
 }
 
 /** 随包基线版本。基线内容更新时递增，将来据此补装。 */
-export const BASELINE_VERSION = "2026-09-22";
+export const BASELINE_VERSION = "2026-11-03";
+
+/**
+ * 范本集合按 **collection id** 补装。
+ *
+ * `seedFromResources` 是顶层判断：老师已经有一个 `knowledge/collections` 时，新随包集合
+ * 永远进不来。这里逐个 id 判断，只补缺的、绝不覆盖老师已有集合。
+ */
+async function seedKnowledgeCollections(): Promise<void> {
+  const source = join(resourcesDir(), KNOWLEDGE_DIR, "collections");
+  if (!(await exists(source))) return;
+  const target = join(knowledgeDir(), "collections");
+  await mkdir(target, { recursive: true });
+  for (const entry of await readdir(source, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const destination = join(target, entry.name);
+    if (await exists(destination)) continue;
+    await cp(join(source, entry.name), destination, { recursive: true, errorOnExist: true, force: false });
+  }
+}

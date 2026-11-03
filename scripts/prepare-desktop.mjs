@@ -44,6 +44,11 @@ if (!(await exists(join(root, "resources", "knowledge")))) {
   throw new Error("缺少 resources/knowledge 基线");
 }
 
+const collections = join(root, "build", "knowledge-collections");
+if (!(await exists(collections))) {
+  console.warn("[警告] 没有 build/knowledge-collections，安装包将不带范本集合；先运行 npm run stage:collections。");
+}
+
 const ocr = join(root, "build", "ocr");
 if (await exists(join(ocr, "venv", "Scripts", "python.exe"))) {
   console.log(`OCR 运行时已就绪：${ocr}`);

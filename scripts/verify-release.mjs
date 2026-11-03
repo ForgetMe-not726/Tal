@@ -123,6 +123,29 @@ checkFile("健康检查路由", join(unpacked, "resources", "app", ".next", "ser
 checkDir("规则基线", join(unpacked, "resources", "rules"));
 checkDir("知识库基线", join(unpacked, "resources", "knowledge"));
 
+const collectionsDir = join(unpacked, "resources", "knowledge", "collections");
+if (!existsSync(collectionsDir)) {
+  fail("安装包缺少 resources/knowledge/collections（范本集合未随包）");
+} else {
+  const collectionIds = readdirSync(collectionsDir).filter((name) => existsSync(join(collectionsDir, name, "manifest.json")));
+  if (collectionIds.length === 0) fail("安装包的 collections 为空");
+  for (const id of collectionIds) {
+    const manifest = JSON.parse(readFileSync(join(collectionsDir, id, "manifest.json"), "utf8"));
+    if (!manifest.license?.trim()) fail(`集合 ${id} 的 license 为空`);
+    const moduleFiles = (manifest.books ?? []).flatMap((book) =>
+      (book.lessons ?? []).flatMap((lesson) => (lesson.modules ?? []).map((module) => join(collectionsDir, id, module.file))),
+    );
+    if (moduleFiles.length === 0) fail(`集合 ${id} 没有模块文件`);
+    const missing = moduleFiles.filter((file) => !existsSync(file));
+    if (missing.length > 0) fail(`集合 ${id} 缺失模块文件：${missing.slice(0, 3).join(", ")}`);
+    for (const book of manifest.books ?? []) {
+      const pages = join(collectionsDir, id, book.ocrDir ?? "", "pages");
+      if (!existsSync(pages)) warn(`集合 ${id}/${book.bookType} 缺少 pages/`);
+    }
+    ok(`范本集合 ${id}`, `${moduleFiles.length} 个模块`);
+  }
+}
+
 if (existsSync(join(unpacked, "document"))) {
   fail("win-unpacked 下存在 document 工作区（试运行残留；发布前删除后重新打包）");
 } else {

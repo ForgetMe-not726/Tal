@@ -2,6 +2,8 @@ appId: com.xueersi.ai-textbook
 productName: AI教材工作台
 copyright: Copyright © 2026
 
+electronDist: node_modules/electron/dist
+
 directories:
   output: release
   buildResources: build
@@ -22,6 +24,11 @@ extraResources:
     filter:
       - "**/*"
       - "!ocr/**"
+  # 由 scripts/stage-knowledge-collections.mjs 从工作区整理出的精简范本集合
+  - from: build/knowledge-collections
+    to: knowledge/collections
+    filter:
+      - "**/*"
   # 便携 Python + MinerU + pipeline 模型（由 scripts/build-ocr-runtime.ps1 生成）
   - from: build/ocr
     to: ocr
@@ -38,6 +45,9 @@ win:
     - target: nsis
       arch:
         - x64
+  # 无签名证书时默认会下载 winCodeSign 去改 exe 资源；内网构建无法访问 GitHub。
+  # 关掉后不影响安装和运行，只跳过 exe 图标/版本资源的写入。
+  signAndEditExecutable: false
   icon: build/icon.png
   artifactName: "AI教材工作台-Setup-${version}.${ext}"
 

@@ -291,8 +291,10 @@ export async function normalizeIntoWorkspace(input: {
   pageImages?: PageImageOptions;
   /** 上游日志尾部，写进 diagnostics 供事后排查。 */
   logTail?: string[];
+  /** 自定义产物目录（资料库 OCR 用）；不传仍写 OCR 资料库目录。 */
+  jobDir?: string;
 }): Promise<NormalizeResult> {
-  const jobDir = ocrJobDir(input.job.dirName ?? input.job.id);
+  const jobDir = input.jobDir ?? ocrJobDir(input.job.dirName ?? input.job.id);
   const structure = buildStructure({
     jobId: input.job.id,
     contentList: input.contentList,

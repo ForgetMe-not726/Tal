@@ -56,17 +56,19 @@
    生成 `build/ocr`（便携 Python + MinerU venv + PDF-Extract-Kit pipeline 模型，约 2.5 GB，
    **不提交 git**）。
 3. `node scripts/configure-ai.mjs --build-only`（从 `.env.local` 生成 `resources/config/ai.json`，含内部 Key；文件不提交 git）
-4. `npm run build`（`next build --webpack`；Turbopack 在含中文源码的 code frame 上会 panic）
-5. `node scripts/prepare-desktop.mjs`（把 `.next/static`、`public` 补进 standalone）
-6. `npx electron-builder --win nsis`（一键安装；首次需配置 `ELECTRON_MIRROR` 与
+4. `npm run stage:collections`（从 `document/knowledge/collections` 整理精简范本集合到
+   `build/knowledge-collections`；只带 manifest、modules 和页图，不带原书 PDF/assets；源目录须由构建机准备）
+5. `npm run build`（`next build --webpack`；Turbopack 在含中文源码的 code frame 上会 panic）
+6. `node scripts/prepare-desktop.mjs`（把 `.next/static`、`public` 补进 standalone）
+7. `npx electron-builder --win nsis`（一键安装；首次需配置 `ELECTRON_MIRROR` 与
    `ELECTRON_BUILDER_BINARIES_MIRROR`，或预先缓存 Electron/NSIS）
-7. `npm run verify:release`：校验安装包 SHA512/size、Next 产物、node_modules、随包 OCR 模型、
+8. `npm run verify:release`：校验安装包 SHA512/size、Next 产物、node_modules、随包 OCR 模型、
    规则/知识库基线、AI 发布配置和版本号，并把 SHA256 写入 `release/SHA256SUMS.txt`。
-8. 产物：`release/AI教材工作台-Setup-<version>.exe`（one-click，per-user，无需管理员）；
+9. 产物：`release/AI教材工作台-Setup-<version>.exe`（one-click，per-user，无需管理员）；
    安装到 `%LOCALAPPDATA%\Programs\ai-textbook-workbench`（electron-builder 对非 ASCII
    productName 使用 ASCII 目录名；桌面/开始菜单快捷方式显示“AI教材工作台”），
-   `document/` 在安装目录下。0.1.0 实测安装包约 1.4 GB，安装后约 2.9 GB
-   （其中 OCR 运行时与模型约 2.5 GB），本机静默安装约 6–8 分钟。
+   `document/` 在安装目录下。0.1.0/P0 实测安装包约 1.55 GB，安装后约 3.0 GB
+   （其中 OCR 运行时与模型约 2.5 GB，范本页图约 0.07 GB），本机静默安装约 6–8 分钟。
 
 ### 运行时约定
 
@@ -74,6 +76,10 @@
 - `MINERU_HOME=<安装目录>/resources/ocr`；`MINERU_TOOLS_CONFIG_JSON` 指向
   `document/.app/ocr/mineru.json`，模型路径在首次启动时写死为随包路径。
 - 便携 venv 的 `pyvenv.cfg` 在首次启动时改写成实际安装路径。
+- 老师导入的 PDF/Markdown 放在 `document/library/`；索引、OCR 缓存放在 `document/.app/retrieval/`；
+  移除资料移到 `document/.recycle/library/`。原始资料只复制、不改写。
+- 范本集合随安装包放在 `resources/knowledge/collections/`，首次启动按集合 id 补装到
+  `document/knowledge/collections/`，不覆盖已有集合。
 
 ### 卸载与升级（2026-11-02 实机回归）
 
@@ -86,6 +92,21 @@
 - 升级直接再次运行新安装包，覆盖程序与随包资源；`document/` 和
   `%APPDATA%\AI教材工作台\ai-key.bin` 不被覆盖。
 - 若需彻底清理，由老师手动删除安装目录下剩余的 `document/`。
+
+### 本地资料库与助手证据（2026-11-03 P0）
+
+- 通用助手现在直接读取 `document/ocr/<dir>/` 中**已确认**的 `content.md` + `structure.json`，
+  返回页码、页内块坐标和原页地址；`/api/ocr/library/<dir>/pages/...` 不依赖任务记录。
+- 老师可在“本地资料库”导入 PDF/Markdown（文件或文件夹），原件复制到
+  `document/library/<item>/files/`；`document/library` 是可直接备份的本地资料目录。
+- 数字版 PDF 在本机抽取逐页文字；扫描版 PDF 自动进入本机 MinerU OCR 队列，资料库显示进度。
+  导入接口立即返回，OCR 串行执行；应用重启后未完成的条目标记为失败并可重试。
+- Markdown 直接索引；PDF 命中可查看原页，Markdown 只显示文字定位。
+- 移除资料移动到 `document/.recycle/library/`，不永久删除；索引和页图缓存放在
+  `document/.app/retrieval/`，可重建。
+- 安装包通过 `npm run stage:collections` 带入 `autumn-2026-l5` 的 manifest、模块正文和页图
+  （约 66 MB，不带原书 PDF/assets）；首次启动按集合 id 补装到 `document/knowledge/collections/`，
+  不覆盖老师已有集合。
 
 ### AI Gateway 凭据（内部工具口径）
 
@@ -111,7 +132,7 @@
 
 ### 交付前检查清单
 
-1. `npm test`、`npm run lint`、`npx tsc --noEmit` 通过；
+1. `npm test`（含 `test:library`、`test:ocr-corpus`）、`npm run lint`、`npx tsc --noEmit` 通过；
 2. `npm run dist:win` 生成含内部 AI 配置的安装包；
 3. `npm run verify:release` 通过并生成 `release/SHA256SUMS.txt`；
 4. 在一台未装 Node/Python 的 Windows x64 机器上按第 2 节走完 10 步；
@@ -128,8 +149,8 @@
 
 - 工作区是教材、规则、OCR 结果、版本和导出物的唯一事实源；
 - 安装包必须装到当前用户**可写**的目录，否则 `document/` 建不出来（程序会给出明确提示，不会写到用户文档目录兜底）；
-- 工作区固定在**安装目录下的 `document/`**（`rules/` 规则库、`knowledge/` 资料库、`ocr/` OCR 内容，以及 `projects/`、`exports/`、`.app/`）；
-- 备份时完整复制 `document/`，保留 `ocr/`、`projects/<id>/sources/originals`、`rules/`、`knowledge/`、`projects/<id>/lessons`、`exports/` 和 `.app/`；
+- 工作区固定在**安装目录下的 `document/`**（`rules/` 规则库、`knowledge/` 资料库、`library/` 老师导入的 PDF/Markdown、`ocr/` OCR 内容，以及 `projects/`、`exports/`、`.app/`）；
+- 备份时完整复制 `document/`，保留 `ocr/`、`library/`、`projects/<id>/sources/originals`、`rules/`、`knowledge/`、`projects/<id>/lessons`、`exports/` 和 `.app/`；`library/` 里的原件不能缺失；
 - .app/index.json 等索引可以重建，但原件、manifest、正文、结构 JSON 和版本文件不能缺失；
 - 项目删除默认进入工作区回收区；除非用户明确确认，不删除原始教材和导出文件。
 

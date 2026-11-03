@@ -7,6 +7,9 @@
 
 import type { KnowledgeEntryRow } from "@/lib/db/types";
 import type { AssistantHit, AssistantQuery, AssistantResult, AssistantSearched, AssistantSourceKind } from "./types.ts";
+import type { OcrCorpusDoc } from "./ocr-corpus.ts";
+import { locateOcrEvidence } from "./ocr-evidence.ts";
+import { pageImageName } from "../ocr/page-names.ts";
 
 const DEFAULT_LIMIT = 12;
 /** 片段前后各留多少字符的上下文。 */
@@ -131,6 +134,18 @@ export type SearchCorpora = {
   }>;
   /** 集合里一共有多少个模块（用于如实说明截断）。 */
   collectionTotal?: number;
+  /** 已确认 OCR 教材（按页/块定位）。 */
+  ocrDocs?: OcrCorpusDoc[];
+  /** 老师导入的 PDF / Markdown 资料（按页/文件定位）。 */
+  libraryDocs?: Array<{
+    itemId: string;
+    documentId: string;
+    documentName: string;
+    pageIndex: number | null;
+    text: string;
+    sourceRef: string;
+    pageImageUrl?: string;
+  }>;
 };
 
 /** 在已收集的语料上做字面检索。**纯函数**，便于单测。 */
@@ -184,6 +199,31 @@ export function searchCorpora(
           score: Math.min(matched.count, COUNT_CAP) + titleBonus(entry.title, keywords),
         });
       }
+
+      // 已确认 OCR 教材：content.md 定页，structure.json 定块；没有块就只定位到页。
+      // Lesson/module 过滤不套用：manifest 没有这两个字段，按模块问问题时也不能
+      // 把整本书的证据全部藏起来。
+      for (const doc of corpora.ocrDocs ?? []) {
+        if (!bookAllowed(doc.bookType)) continue;
+        const evidence = locateOcrEvidence(doc, keywords);
+        if (!evidence) continue;
+        hits.push({
+          kind: "source",
+          snippet: evidence.snippet,
+          sourceRef: `ocr:${doc.jobId}:p${evidence.pageIndex}:${evidence.blockId ?? "page"}`,
+          documentName: doc.documentName,
+          bookType: doc.bookType,
+          lessonNumber: null,
+          moduleKey: null,
+          pageIndex: evidence.pageIndex,
+          blockId: evidence.blockId,
+          box: evidence.box,
+          status: "confirmed",
+          ocrJobId: doc.jobId,
+          pageImageUrl: `/api/ocr/library/${encodeURIComponent(doc.dirName)}/pages/${pageImageName(evidence.pageIndex)}`,
+          score: Math.min(evidence.count, COUNT_CAP) + titleBonus(doc.documentName, keywords),
+        });
+      }
     }
 
     if (kindAllowed("rule")) {
@@ -234,6 +274,27 @@ export function searchCorpora(
     }
 
     if (kindAllowed("reference")) {
+      // 老师导入的本地资料（PDF/Markdown）。没有书种/Lesson/模块，不套这三类过滤。
+      for (const doc of corpora.libraryDocs ?? []) {
+        const matched = snippetOf(doc.text, keywords);
+        if (!matched) continue;
+        hits.push({
+          kind: "reference",
+          snippet: matched.snippet,
+          sourceRef: doc.sourceRef,
+          documentName: doc.documentName,
+          bookType: null,
+          lessonNumber: null,
+          moduleKey: null,
+          pageIndex: doc.pageIndex,
+          blockId: null,
+          box: null,
+          status: "confirmed",
+          ocrJobId: null,
+          ...(doc.pageImageUrl ? { pageImageUrl: doc.pageImageUrl } : {}),
+          score: Math.min(matched.count, COUNT_CAP) + titleBonus(doc.documentName, keywords),
+        });
+      }
       for (const reference of corpora.references) {
         const matched = snippetOf(reference.text, keywords);
         if (!matched) continue;
@@ -296,6 +357,8 @@ export function searchCorpora(
     versions: corpora.versions.length,
     references: corpora.references.length,
     exemplars: (corpora.collectionDocs ?? []).length,
+    ocrSources: (corpora.ocrDocs ?? []).length,
+    libraryDocs: (corpora.libraryDocs ?? []).length,
     keywords,
   };
 

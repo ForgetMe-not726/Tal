@@ -84,6 +84,10 @@ export type AssistantSearched = {
   references: number;
   /** 范本教材的模块数。 */
   exemplars: number;
+  /** 已确认 OCR 教材的来源数。 */
+  ocrSources?: number;
+  /** 老师导入的本地资料文档数。 */
+  libraryDocs?: number;
   /** 本次实际用的关键词。 */
   keywords: string[];
 };

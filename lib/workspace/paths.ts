@@ -84,6 +84,8 @@ export const ORIGINALS_DIR = "originals";
 export const OCR_DIR = "ocr";
 export const JOBS_DIR = "jobs";
 export const REVIEW_DIR = "review";
+export const LIBRARY_DIR = "library";
+export const RECYCLE_DIR = ".recycle";
 
 export const RULE_FILE = "rule.json";
 export const RULE_BINDINGS_FILE = "bindings.json";
@@ -131,6 +133,41 @@ export function ruleSetDir(ruleKey: string): string {
 
 export function knowledgeDir(): string {
   return join(workspaceRoot(), KNOWLEDGE_DIR);
+}
+
+/** 老师导入的 PDF / Markdown 资料库（与 OCR 教材、知识集合分开）。 */
+export function libraryDir(): string {
+  return join(workspaceRoot(), LIBRARY_DIR);
+}
+
+export function libraryItemDir(id: string): string {
+  return join(libraryDir(), safeSegment(id));
+}
+
+/** 资料库索引缓存：可重建，不放进老师导入的原始资料目录。 */
+export function libraryIndexDir(): string {
+  return join(appDir(), "retrieval", "library");
+}
+
+export function libraryIndexFile(id: string): string {
+  return join(libraryIndexDir(), `${safeSegment(id)}.json`);
+}
+
+export function libraryPagesDir(id: string, documentId: string): string {
+  return join(appDir(), "retrieval", "library-pages", safeSegment(id), safeSegment(documentId));
+}
+
+/** 删除资料/集合的回收区；可恢复，不做静默永久删除。 */
+export function recycleDir(): string {
+  return join(workspaceRoot(), RECYCLE_DIR);
+}
+
+export function libraryRecycleDir(): string {
+  return join(recycleDir(), LIBRARY_DIR);
+}
+
+export function collectionsRecycleDir(): string {
+  return join(recycleDir(), "collections");
 }
 
 export function moduleDefinitionsPath(): string {

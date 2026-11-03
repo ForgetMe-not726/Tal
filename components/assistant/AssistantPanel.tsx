@@ -73,6 +73,7 @@ export function AssistantPanel() {
           scope,
           projectId: scope === "project" ? projectId : undefined,
           sourceKind: kind || undefined,
+          needPageEvidence: true,
         }),
       });
       const data = (await response.json()) as SearchResponse;

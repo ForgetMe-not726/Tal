@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { NextResponse } from "next/server";
 import { ensureWorkspace } from "@/lib/workspace/bootstrap";
-import { knowledgeDir, ocrLibraryDir, workspaceRoot } from "@/lib/workspace/paths";
+import { knowledgeDir, libraryDir, ocrLibraryDir, recycleDir, workspaceRoot } from "@/lib/workspace/paths";
 
 export const runtime = "nodejs";
 
@@ -10,6 +10,8 @@ const TARGETS: Record<string, () => string> = {
   workspace: workspaceRoot,
   ocr: ocrLibraryDir,
   knowledge: knowledgeDir,
+  library: libraryDir,
+  recycle: recycleDir,
 };
 
 export async function POST(request: Request) {

@@ -22,6 +22,8 @@ import { knowledgeDir } from "@/lib/workspace/paths";
 import { listCollectionModules, readCollectionChunk } from "@/lib/knowledge/collections";
 import { searchCorpora, type SearchCorpora } from "./match.ts";
 import type { AssistantQuery, AssistantResult } from "./types.ts";
+import { collectOcrCorpus } from "./ocr-corpus.ts";
+import { collectLibraryCorpus } from "../library/search.ts";
 
 /** 单个语料最多扫描多少字符，避免一条超长正文把检索拖住。 */
 const MAX_SCAN_CHARS = 200_000;
@@ -213,10 +215,14 @@ async function buildDocumentIndex(projectIds: readonly string[]) {
 
 /** 跑一次检索（收集 + 匹配）。 */
 export async function searchAssistant(query: AssistantQuery): Promise<AssistantResult> {
-  const corpora = await collectCorpora(query);
+  const [corpora, ocr, library] = await Promise.all([
+    collectCorpora(query),
+    collectOcrCorpus(query),
+    collectLibraryCorpus(),
+  ]);
   const ocrByProject = await buildDocumentIndex(corpora.projects.map((project) => project.id));
-  const result = searchCorpora(corpora, query, { ocrByProject });
-  const gaps: string[] = [];
+  const result = searchCorpora({ ...corpora, ocrDocs: ocr.docs, libraryDocs: library.docs }, query, { ocrByProject });
+  const gaps: string[] = [...ocr.gaps, ...library.gaps];
   if (corpora.references.length === 0) {
     gaps.push("工作区里没有装语法参考知识库（knowledge/grammar/），本次没有搜到参考资料。");
   }
@@ -224,6 +230,9 @@ export async function searchAssistant(query: AssistantQuery): Promise<AssistantR
     gaps.push(
       `知识库里的资料集合有 ${corpora.collectionTotal} 个模块，本次只检索了前 ${(corpora.collectionDocs ?? []).length} 个（按数量上限截断）。`,
     );
+  }
+  if (query.lessonNumber != null || query.moduleKey != null) {
+    gaps.push("按 Lesson/模块筛选时，OCR 教材与本地资料没有对应的结构化字段，未套用这两个过滤条件。");
   }
   return { ...result, gaps };
 }
